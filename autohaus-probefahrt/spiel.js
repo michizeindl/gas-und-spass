@@ -29,6 +29,13 @@
   // Am Bild abgemessen: Auto 1686 px lang, Mitte bei y 887, Dach von y 632 bis 1360.
   const SPIELERAUTO = new Image(), BILD_LAENGE = 1686, BILD_MITTE = 887, DACH = [632, 1360];
   let spielerAuto = null;
+  const KEGEL = new Image();   // Leitkegel von oben (auf die Fußplatte zugeschnitten)
+  KEGEL.src = 'bilder/leitkegel.webp';
+  const motor = R_.dauerton('motor');
+  const bildLaden = n => { const b = new Image(); b.src = 'bilder/' + n + '.webp'; return b; };
+  const BAKE = bildLaden('bake'), OEL = bildLaden('oel'), LOCH = bildLaden('loch');
+  // Gemalte Autos von oben (12 Stück, Opel-Farben) für den übrigen Verkehr; ohne Bild bleibt die Zeichnung
+  const FREMDE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => { const b = new Image(); b.src = 'bilder/autos/auto-' + n + '.webp'; return b; });
   SPIELERAUTO.onload = () => { spielerAuto = R_.umfaerben(SPIELERAUTO); };
   SPIELERAUTO.src = 'bilder/auto-spieler.webp';
 
@@ -56,10 +63,11 @@
       }
       if (!zweite && s !== (frei + 1) % SPUREN) continue;
       const r = Math.random();
-      if (r < 0.45) dinge.push({ art: 'auto', s, y: y + Math.random() * 40, w: AB, h: AL, farbe: FARBEN[Math.random() * FARBEN.length | 0] });
-      else if (r < 0.65) dinge.push({ art: 'bake', s, y, w: 86, h: 26 });
-      else if (r < 0.85) dinge.push({ art: 'pylon', s, y, w: 30, h: 30 });
-      else dinge.push({ art: 'oel', s, y, w: 70, h: 50 });
+      if (r < 0.4) dinge.push({ art: 'auto', s, y: y + Math.random() * 40, w: AB, h: AL, farbe: FARBEN[Math.random() * FARBEN.length | 0], bild: Math.random() * FREMDE.length | 0 });
+      else if (r < 0.58) dinge.push({ art: 'bake', s, y, w: 86, h: 26 });
+      else if (r < 0.74) dinge.push({ art: 'pylon', s, y, w: 30, h: 30 });
+      else if (r < 0.88) dinge.push({ art: 'oel', s, y, w: 70, h: 50 });
+      else dinge.push({ art: 'loch', s, y, w: 52, h: 50 });
     }
   }
   function neueDeko(y) {
@@ -109,6 +117,9 @@
     } else if (phase === 'aus' && phaseT > 1.0 && R_.zustand === 'spiel') {
       R_.ende(punkte(), { ueberschrift: 'Probefahrt beendet', verzoegerung: 100 });
     }
+    // Motor dreht mit dem Tempo hoch; im Leerlauf (Countdown) leise, nach dem Ende aus
+    const anteil = (tempo - TEMPO_START) / (TEMPO_MAX - TEMPO_START);
+    motor.stellen(phase === 'fahren' ? 1 : phase === 'bereit' ? 0.5 : 0, phase === 'fahren' ? 0.85 + anteil * 0.6 : 0.75);
     // Spurwechsel weich, beim Rutschen etwas langsamer
     spurX += (spur - spurX) * Math.min(1, dt * (rutschen > 0 ? 6 : 16));
     rutschen = Math.max(0, rutschen - dt);
@@ -124,6 +135,13 @@
         d.weg = true; muenzen++;
         R_.ton('gut');
         meldung('+' + MUENZE, F.akzent);
+      } else if (d.art === 'loch') {
+        // Schlagloch: rumpelt und bremst, kostet aber keine Beule
+        if (d.getroffen) return;
+        d.getroffen = true; wackeln = 0.3;
+        tempo = Math.max(TEMPO_START, tempo * 0.85);
+        R_.ton('crash');
+        meldung('Rumms!', '#ffd27a');
       } else if (d.art === 'oel') {
         if (rutschen > 0) return;
         rutschen = 0.5;
@@ -200,10 +218,14 @@
     dinge.forEach(d => {
       const x = zuX(d.s), y = zuY(d.y);
       if (y < -120 || y > h + 120) return;
-      if (d.art === 'auto') zeichneAuto(g, x, y, d.farbe, false, d.getroffen ? 0.25 : 0);
+      if (d.art === 'auto') zeichneAuto(g, x, y, d.farbe, false, d.getroffen ? 0.25 : 0, d.bild);
       else if (d.art === 'pylon') pylon(g, x, y);
       else if (d.art === 'bake') bake(g, x, y);
       else if (d.art === 'oel') oel(g, x, y);
+      else if (d.art === 'loch') {
+        if (LOCH.complete && LOCH.naturalWidth) bildZeichnen(g, LOCH, x, y, 56 * k);
+        else { g.fillStyle = 'rgba(10,10,12,.8)'; g.beginPath(); g.ellipse(x, y, 24 * k, 22 * k, 0, 0, P * 2); g.fill(); }
+      }
       else if (d.art === 'muenze') muenze(g, x, y);
     });
 
@@ -266,12 +288,20 @@
     R_.zeichneLogo(g, x + w * 0.1, y - hh * 0.88, w * 0.8, hh * 0.76, null, true);
   }
 
-  function zeichneAuto(g, x, y, farbe, mitLogo, kipp) {
+  function zeichneAuto(g, x, y, farbe, mitLogo, kipp, bild) {
     const l = AL * k / 2, b = AB * k / 2, r = 11 * k;
     g.save();
     g.translate(x, y); g.rotate(kipp || 0);
     g.fillStyle = 'rgba(0,0,0,.35)';
     g.beginPath(); g.roundRect(-b + 4 * k, -l + 6 * k, b * 2, l * 2, r); g.fill();
+    const fremd = bild != null && FREMDE[bild];
+    if (!mitLogo && fremd && fremd.complete && fremd.naturalWidth) {
+      // gemaltes Auto: so skaliert, dass es genau so lang ist wie das Auto im Spiel
+      const s = AL * k / fremd.naturalHeight;
+      g.drawImage(fremd, -fremd.naturalWidth * s / 2, -l, fremd.naturalWidth * s, AL * k);
+      g.restore();
+      return;
+    }
     if (mitLogo && spielerAuto) {
       const s = AL * k / BILD_LAENGE, dy = ((DACH[0] + DACH[1]) / 2 - BILD_MITTE) * s, dl = (DACH[1] - DACH[0]) * s;
       g.drawImage(spielerAuto, -spielerAuto.width * s / 2, -BILD_MITTE * s, spielerAuto.width * s, spielerAuto.height * s);
@@ -303,6 +333,12 @@
 
   function pylon(g, x, y) {
     const r = 15 * k;
+    if (KEGEL.complete && KEGEL.naturalWidth) {   // gemalter Leitkegel von oben
+      g.fillStyle = 'rgba(0,0,0,.3)';
+      g.fillRect(x - r + 3 * k, y - r + 4 * k, r * 2, r * 2);
+      g.drawImage(KEGEL, x - r * 1.1, y - r * 1.1, r * 2.2, r * 2.2);
+      return;
+    }
     g.fillStyle = 'rgba(0,0,0,.3)';
     g.beginPath(); g.arc(x + 3 * k, y + 4 * k, r, 0, P * 2); g.fill();
     g.fillStyle = '#ff7a1a';
@@ -310,7 +346,13 @@
     g.strokeStyle = '#fff'; g.lineWidth = 4 * k;
     g.beginPath(); g.arc(x, y, r * 0.55, 0, P * 2); g.stroke();
   }
+  // Gemalte Hindernisse (Baustellenbake, Ölfleck, Schlagloch), auf eine Breite skaliert und mittig gesetzt
+  function bildZeichnen(g, bild, x, y, breite) {
+    const h = breite * bild.naturalHeight / bild.naturalWidth;
+    g.drawImage(bild, x - breite / 2, y - h / 2, breite, h);
+  }
   function bake(g, x, y) {
+    if (BAKE.complete && BAKE.naturalWidth) return bildZeichnen(g, BAKE, x, y, 92 * k);
     const w = 86 * k, h = 26 * k;
     g.fillStyle = 'rgba(0,0,0,.3)';
     g.fillRect(x - w / 2 + 4 * k, y - h / 2 + 5 * k, w, h);
@@ -327,6 +369,7 @@
     g.beginPath(); g.arc(x - w / 2 + 6 * k, y - h / 2, 5 * k, 0, P * 2); g.arc(x + w / 2 - 6 * k, y - h / 2, 5 * k, 0, P * 2); g.fill();
   }
   function oel(g, x, y) {
+    if (OEL.complete && OEL.naturalWidth) return bildZeichnen(g, OEL, x, y, 78 * k);
     g.fillStyle = 'rgba(15,15,20,.85)';
     g.beginPath();
     g.ellipse(x, y, 34 * k, 22 * k, 0.3, 0, P * 2);
@@ -356,9 +399,17 @@
     texte: {
       titel: 'Probefahrt',
       untertitel: 'Wie weit kommst du?',
-      anleitung: 'Tippe links oder rechts, um die Spur zu wechseln. Weiche Autos und Baustellen aus und sammle Münzen ein. Vorsicht bei Öl! Drei Beulen, dann ist die Probefahrt vorbei.',
+      anleitung: 'Tippe links oder rechts, um die Spur zu wechseln. Weiche Autos und Baustellen aus und sammle Münzen ein. Vorsicht bei Öl und Schlaglöchern! Drei Beulen, dann ist die Probefahrt vorbei.',
       ende: 'Lust auf eine echte Probefahrt? Wir haben den passenden Wagen für dich.',
     },
+    // Aufnahmen (Pixabay Content License); 'crash' ersetzt den erzeugten Ton gleichen Namens
+    klaenge: {
+      klick: { datei: 'klaenge/klick.wav', pegel: 0.35 },   // Ton-Knopf
+      crash: { datei: 'klaenge/blechschaden.wav', pegel: 0.5 },
+      motor: { datei: 'klaenge/motor-fahrt.wav', pegel: 0.22 },
+      musik: { datei: 'klaenge/musik.wav', pegel: 0.1 },   // leise Hintergrundmusik
+    },
+    schleife: 'musik',
     neu, schritt, zeichne, runter, groesse,
   });
 })();

@@ -59,6 +59,14 @@
   .text { margin: 0; font-size: 14px; opacity: .75; line-height: 1.35; }
   .best { margin: 6px 0 0; font-size: 13px; color: var(--akzent); font-weight: 700; }
   .best:empty { display: none; }
+  /* Spiel noch in Arbeit: grau, nicht anklickbar, mit Hinweis */
+  .spiel.bald { filter: grayscale(1); opacity: .5; cursor: default; pointer-events: none; }
+  .spiel.bald .best { display: none; }
+  .demnaechst { display: none; }
+  .spiel.bald .demnaechst {
+    display: inline-block; margin: 8px 0 0; padding: 3px 10px; border-radius: 999px;
+    border: 1px solid currentColor; font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  }
   #tonKnopf {
     position: fixed; top: 10px; right: 10px; width: 40px; height: 40px; border-radius: 50%; border: 0; padding: 0;
     background: rgba(255,255,255,.12); color: #fff; cursor: pointer; display: grid; place-items: center;
@@ -139,7 +147,8 @@
     </span>
   </a>
 
-  <a class="spiel" href="autohaus-probefahrt/" data-id="autohaus-probefahrt" data-format="punkte">
+  <!-- Probefahrt ist noch in Arbeit: grau und nicht anklickbar (Klasse „bald“ und href entfernen, sobald sie fertig ist) -->
+  <a class="spiel bald" aria-disabled="true" data-id="autohaus-probefahrt" data-format="punkte">
     <span class="icon" aria-hidden="true">
       <!-- Straße mit Auto -->
       <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
@@ -152,6 +161,7 @@
     <span>
       <p class="name">Probefahrt</p>
       <p class="text">Spur wechseln, ausweichen, Münzen sammeln.</p>
+      <p class="demnaechst">Demnächst</p>
       <p class="best"></p>
     </span>
   </a>
@@ -209,10 +219,13 @@
     symbol();
     spielen();                                                     // klappt, wenn der Browser es schon erlaubt
     ['pointerdown', 'keydown', 'touchstart'].forEach(e => addEventListener(e, spielen, { passive: true }));
+    const klick = new Audio('klaenge/klick.wav');   // Pixabay, „Pop Click“ von andressamd
+    klick.volume = 0.35;
     knopf.addEventListener('click', () => {
       tonAn = !tonAn;
       try { localStorage.setItem('mg:ton', tonAn ? 'an' : 'aus'); } catch (e) { /* privat */ }
       symbol();
+      if (tonAn) { klick.currentTime = 0; klick.play().catch(() => {}); }
       if (tonAn) { gespielt = false; musik.currentTime = 0; musik.volume = PEGEL; spielen(); }   // auf Wunsch noch einmal
       else musik.pause();
     });

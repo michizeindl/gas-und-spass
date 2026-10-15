@@ -182,6 +182,37 @@
     try { v.gain.setTargetAtTime(0.0001, ac.currentTime, 0.25); q.stop(ac.currentTime + 1.5); } catch (e) { /* egal */ }
   }
 
+  // Dauertöne (z. B. Motor): laufen in Schleife, das Spiel stellt laufend Lautstärke (0–1) und Tempo ein.
+  // Enden mit dem Spiel oder wenn der Ton ausgeschaltet wird.
+  const dauertoene = [];
+  function dauerton(name) {
+    const st = { q: null, v: null };
+    const aus = () => {
+      if (!st.q) return;
+      try { st.v.gain.setTargetAtTime(0.0001, ac.currentTime, 0.15); st.q.stop(ac.currentTime + 1); } catch (e) { /* egal */ }
+      st.q = st.v = null;
+    };
+    const steuer = {
+      stellen(pegel, tempo) {
+        const b = clips[name + ':fertig'];
+        if (!tonAn || zustand !== 'spiel' || !b || !ac || ac.state !== 'running') { aus(); return; }
+        if (!st.q) {
+          st.q = ac.createBufferSource(); st.v = ac.createGain();
+          st.q.buffer = b; st.q.loop = true;
+          st.v.gain.value = 0.0001;
+          st.q.connect(st.v).connect(ac.destination);
+          st.q.start(0, Math.random() * b.duration);
+        }
+        st.v.gain.setTargetAtTime(Math.max(0.0001, pegel * clipPegel[name]), ac.currentTime, 0.08);
+        if (tempo) st.q.playbackRate.setTargetAtTime(tempo, ac.currentTime, 0.12);
+      },
+      aus,
+    };
+    dauertoene.push(steuer);
+    return steuer;
+  }
+  function dauertoeneAus() { dauertoene.forEach(d => d.aus()); }
+
   function ton(name) {
     if (!tonAn) return;
     const a = audio();
@@ -240,7 +271,7 @@
   function tonSymbol() { tonKnopf.innerHTML = tonAn ? SYM.tonAn : SYM.tonAus; }
   tonKnopf.addEventListener('click', () => {
     tonAn = !tonAn; schreiben('ton', tonAn ? 'an' : 'aus'); tonSymbol();
-    if (tonAn) { audio(); ton('klick'); if (zustand === 'spiel') schleifeStarten(); } else schleifeStoppen();
+    if (tonAn) { audio(); ton('klick'); if (zustand === 'spiel') schleifeStarten(); } else { schleifeStoppen(); dauertoeneAus(); }
   });
   tonSymbol();
 
@@ -294,6 +325,7 @@
     if (zustand !== 'spiel') return;
     zustand = 'ende';
     schleifeStoppen();
+    dauertoeneAus();
     extra = extra || {};
     const alt = lesen(bestKey());
     const neu = besser(punkte, alt == null ? null : +alt);
@@ -368,7 +400,7 @@
   window.Rahmen = {
     kunde: K, farben, textFarbe, toenen, mitAlpha, umfaerben,
     zeichneLogo, get logoBereit() { return logoBereit; },
-    ton, ende, anzeige,
+    ton, dauerton, ende, anzeige,
     get zustand() { return zustand; },
     spiel(def) {
       S = def;

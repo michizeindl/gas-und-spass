@@ -418,6 +418,7 @@
     },
     // Aufnahmen: Pixabay Content License; Werkstatt-Geräusch von Freesound (CC BY 3.0, Namensnennung in quellen)
     klaenge: {
+      klick: { datei: 'klaenge/klick.wav', pegel: 0.35 },   // Ton-Knopf
       schlagschrauber: { datei: 'klaenge/schlagschrauber.wav', pegel: 0.45 },
       ratsche: { datei: 'klaenge/ratsche.wav', pegel: 0.4 },
       fehler: { datei: 'klaenge/fehler.wav', pegel: 0.3 },

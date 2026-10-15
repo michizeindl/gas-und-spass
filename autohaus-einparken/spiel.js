@@ -29,24 +29,30 @@
   // a = Drehung: 0 = Auto zeigt nach oben, P/2 = nach rechts
   const auto = (x, y, a) => ({ art: 'auto', x, y, w: AB, h: AL, a: a || 0 });
   const wand = (x, y, w, h) => ({ art: 'wand', x, y, w, h, a: 0 });
-  const pylon = (x, y) => ({ art: 'pylon', x, y, w: 20, h: 20, a: 0 });
+  const pylon = (x, y) => ({ art: 'pylon', x, y, w: 26, h: 26, a: 0 });
+  // Baum in runder Pflanzinsel: d = Bildgröße; anstoßen kann man nur an der Pflanzinsel, die Krone ragt darüber
+  const baum = (x, y, bild, d) => ({ art: 'baum', x, y, w: d * 0.7, h: d * 0.7, a: 0, bild, d });
   const LEVEL = [
     { start: { x: 300, y: 780, a: 0 }, ziel: { x: 300, y: 220, w: 72, h: 110, a: 0 },
-      hindernisse: [auto(190, 220), auto(410, 220)], logo: [300, 520], hinweis: true },
+      hindernisse: [auto(190, 220), auto(410, 220), baum(85, 560, 0, 110), baum(520, 690, 1, 80)], logo: [300, 520], hinweis: true },
     { start: { x: 120, y: 770, a: 0 }, ziel: { x: 390, y: 190, w: 66, h: 104, a: 0 },
       hindernisse: [auto(120, 190), auto(210, 190), auto(300, 190), auto(480, 190), pylon(300, 520)], logo: [430, 600] },
     { start: { x: 140, y: 790, a: 0 }, ziel: { x: 505, y: 450, w: 66, h: 104, a: P / 2 },
-      hindernisse: [auto(505, 355, P / 2), auto(505, 545, P / 2), auto(505, 640, P / 2), pylon(260, 330), pylon(330, 330)], logo: [230, 560] },
+      hindernisse: [auto(505, 355, P / 2), auto(505, 545, P / 2), auto(505, 640, P / 2), pylon(260, 330), pylon(330, 330), baum(95, 130, 0, 110), baum(330, 150, 1, 80)], logo: [230, 560] },
     { start: { x: 545, y: 800, a: 0 }, ziel: { x: 100, y: 170, w: 66, h: 104, a: 0 },
       hindernisse: [wand(300, 470, 380, 16), auto(190, 170), auto(280, 170), pylon(380, 300), pylon(430, 640)], logo: [300, 650] },
     { start: { x: 300, y: 110, a: P }, ziel: { x: 300, y: 770, w: 60, h: 100, a: 0 },
-      hindernisse: [auto(228, 770), auto(372, 770), wand(300, 420, 200, 16), pylon(120, 600), pylon(480, 600)], logo: [300, 280] },
+      hindernisse: [auto(228, 770), auto(372, 770), wand(300, 420, 200, 16), pylon(120, 600), pylon(480, 600), baum(75, 250, 0, 110), baum(535, 840, 1, 80)], logo: [300, 280] },
     { start: { x: 90, y: 800, a: 0 }, ziel: { x: 300, y: 215, w: 64, h: 104, a: 0 },
       hindernisse: [wand(222, 205, 16, 230), wand(378, 205, 16, 230), wand(300, 98, 172, 16),
         pylon(170, 520), pylon(430, 520), auto(510, 790, 0.3), auto(500, 650, 0.3)], logo: [300, 650], halle: true },
   ];
   // Jedes geparkte Auto bekommt eine feste Farbe
   LEVEL.forEach(l => l.hindernisse.forEach((h, i) => { h.farbe = FARBEN[(i * 3 + l.start.x) % FARBEN.length]; }));
+  // Gemalte Autos von oben (12 Stück, Opel-Farben) reihum auf die geparkten Autos verteilen; ohne Bild bleibt die Zeichnung
+  const FREMDE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => { const b = new Image(); b.src = 'bilder/autos/auto-' + n + '.webp'; return b; });
+  let autoNr = 0;
+  LEVEL.forEach(l => l.hindernisse.forEach(h => { if (h.art === 'auto') h.bild = autoNr++ % FREMDE.length; }));
 
   let lv, wagen, pfad, route, strecke, zeichnet, phase, phaseT, leben, punkte, meldung, wackeln, funken, schonGezogen;
   let ansicht = new DOMMatrix(), umkehr = new DOMMatrix();
@@ -60,11 +66,26 @@
   // Am Bild abgemessen: Auto 1686 px lang, Mitte bei y 887, Dach von y 632 bis 1360.
   const SPIELERAUTO = new Image(), BILD_LAENGE = 1686, BILD_MITTE = 887, DACH = [632, 1360];
   let spielerAuto = null;
+  const KEGEL = new Image();   // Leitkegel von oben (auf die Fußplatte zugeschnitten)
+  KEGEL.src = 'bilder/leitkegel.webp';
+  const MAUER = new Image();   // Betontextur für Mauern, nahtlos wiederholbar
+  MAUER.src = 'bilder/mauer.webp';
+  let mauerMuster = null;
+  const BAEUME = [1, 2].map(n => { const b = new Image(); b.src = 'bilder/baum-' + n + '.webp'; return b; });
+  function baumZeichnen(g, h) {
+    const b = BAEUME[h.bild];
+    if (b.complete && b.naturalWidth) { g.drawImage(b, h.x - h.d / 2, h.y - h.d / 2, h.d, h.d); return; }
+    g.fillStyle = '#3d6b35'; g.beginPath(); g.arc(h.x, h.y, h.d / 2, 0, P * 2); g.fill();   // ohne Bild: grüne Krone
+  }
+  const motorLeerlauf = R_.dauerton('motorLeerlauf'), motorFahrt = R_.dauerton('motorFahrt');
   SPIELERAUTO.onload = () => { spielerAuto = R_.umfaerben(SPIELERAUTO); };
   SPIELERAUTO.src = 'bilder/auto-spieler.webp';
 
   function neu() {
-    lv = 0; leben = LEBEN; punkte = 0; schonGezogen = false;
+    // #luecke=4 hinter der Adresse startet direkt bei Parklücke 4 (zum Testen)
+    const sprung = /luecke=(\d)/.exec(location.hash);
+    lv = sprung ? Math.max(0, Math.min(LEVEL.length - 1, sprung[1] - 1)) : 0;
+    leben = LEBEN; punkte = 0; schonGezogen = false;
     neuerVersuch();
   }
   function neuerVersuch() {
@@ -158,7 +179,6 @@
     route = glaetten(pfad);
     strecke = 0;
     phase = 'fahren'; phaseT = 0;
-    R_.ton('motor');
   }
 
   // ---------- Ablauf ----------
@@ -168,14 +188,17 @@
     funken.forEach(f => { f.x += f.vx * dt; f.y += f.vy * dt; f.t += dt; });
     funken = funken.filter(f => f.t < 0.6);
 
+    let tempo = 0;
     if (phase === 'fahren') {
       const gesamt = (route.length - 1) * SCHRITT, rest = gesamt - strecke;
-      strecke = Math.min(gesamt, strecke + Math.min(TEMPO, 60 + rest * 2.4) * dt);
+      tempo = Math.min(TEMPO, 60 + rest * 2.4);
+      strecke = Math.min(gesamt, strecke + tempo * dt);
       const p = routePunkt(strecke), v = routePunkt(Math.max(0, strecke - 8)), n = routePunkt(Math.max(16, strecke + 8));
       wagen.x = p.x; wagen.y = p.y;
       if (Math.hypot(n.x - v.x, n.y - v.y) > 0.5) wagen.a = Math.atan2(n.x - v.x, -(n.y - v.y));
       if (kollision()) crash();
       else if (strecke >= gesamt) pruefen();
+      else parksensor(dt);
     } else if (phase === 'crash' && phaseT > 1.3) {
       if (leben <= 0) { phase = 'aus'; R_.ende(punkte, { ueberschrift: 'Zu viele Beulen!', verzoegerung: 200 }); }
       else neuerVersuch();
@@ -188,8 +211,28 @@
         R_.ende(punkte, { ueberschrift: 'Alle Lücken geschafft!', verzoegerung: 200 });
       } else { lv++; neuerVersuch(); }
     }
+    // Motor: Leerlauf, solange man die Linie zieht; beim Fahren dreht er je nach Tempo höher
+    motorLeerlauf.stellen(phase === 'zeichnen' ? 1 : phase === 'fahren' ? 0.35 : 0);
+    motorFahrt.stellen(phase === 'fahren' ? 1 : 0, 0.8 + tempo / TEMPO * 0.45);
     if (meldung) meldung.t += dt;
     R_.anzeige(`Parklücke ${Math.min(lv + 1, LEVEL.length)}/${LEVEL.length}`, '♥'.repeat(leben) + '♡'.repeat(LEBEN - leben) + '  ' + punkte + ' P');
+  }
+
+  // Parksensor: piept schneller, je näher das Auto einem Hindernis kommt (wie beim Parkassistenten)
+  let piepT = 0;
+  function abstandHindernis() {
+    const box = wagenBox();
+    for (const m of [5, 10, 16, 24, 34, 46, 60]) {
+      const gross = { x: box.x, y: box.y, a: box.a, w: AB + 2 * m, h: AL + 2 * m };
+      if (LEVEL[lv].hindernisse.some(h => ueberlappt(gross, h))) return m;
+    }
+    return Infinity;
+  }
+  function parksensor(dt) {
+    const d = abstandHindernis();
+    if (d === Infinity) { piepT = 0; return; }
+    piepT -= dt;
+    if (piepT <= 0) { R_.ton('parksensor'); piepT = d <= 5 ? 0.09 : 0.1 + d / 60 * 0.55; }
   }
 
   function crash() {
@@ -219,7 +262,8 @@
     punkte += p;
     phase = 'geparkt'; phaseT = 0;
     meldung = { text: (p >= 90 ? 'Perfekt geparkt!' : p >= 70 ? 'Sauber!' : 'Geparkt – passt schon') + '  +' + p, farbe: F.akzent, t: 0 };
-    R_.ton('gut');
+    R_.ton('handbremse');                       // Handbremse ziehen, dann Tür zu
+    setTimeout(() => R_.ton('tuer'), 450);
   }
 
   // ---------- Zeichnen ----------
@@ -231,8 +275,8 @@
     ansicht = new DOMMatrix().translate(B / 2 + wx, oben + (H - oben) / 2 + wy).rotate(quer ? -90 : 0).scale(s).translate(-W / 2, -HW / 2);
     umkehr = ansicht.inverse();
 
-    // Rasen rundherum
-    g.fillStyle = R_.toenen('#2e5d34', -0.25);
+    // Rand rundherum schwarz
+    g.fillStyle = '#000000';
     g.fillRect(0, 0, B, H);
 
     g.save();
@@ -253,21 +297,14 @@
       g.fillRect(0, 0, W, HW);
     }
     // Bordstein
-    g.strokeStyle = '#a7adb4'; g.lineWidth = 10;
+    g.strokeStyle = F.haupt; g.lineWidth = 10;   // Bordstein in der Kundenfarbe
     g.strokeRect(-5, -5, W + 10, HW + 10);
-    // Logo auf den Boden gemalt
-    if (L.logo) {
-      g.save();
-      g.translate(L.logo[0], L.logo[1]); g.rotate(quer ? P / 2 : 0); // immer aufrecht lesbar
-      R_.zeichneLogo(g, -130, -50, 260, 100, 0.2);
-      g.restore();
-    }
     if (L.halle) {
       g.fillStyle = R_.mitAlpha(F.haupt, 0.18);
       g.fillRect(230, 106, 140, 214);
     }
     // Parkbuchten der geparkten Autos
-    L.hindernisse.filter(h => h.art === 'auto').forEach(h => bucht(g, { x: h.x, y: h.y, w: 66, h: 104, a: h.a }, 'rgba(255,255,255,.55)'));
+    L.hindernisse.filter(h => h.art === 'auto').forEach(h => bucht(g, { x: h.x, y: h.y, w: 66, h: 104, a: h.a }, R_.mitAlpha(F.haupt, 0.85)));
     // Ziel-Lücke
     const z = L.ziel, blink = 0.5 + 0.5 * Math.sin(performance.now() / 250);
     g.save();
@@ -283,7 +320,7 @@
     g.fillText('P', 0, 2);
     g.restore();
 
-    L.hindernisse.forEach(h => hindernis(g, h));
+    L.hindernisse.forEach(h => { if (h.art !== 'baum') hindernis(g, h); });
 
     // Gezogene Linie
     const linie = phase === 'fahren' ? route.slice(Math.floor(strecke / SCHRITT)) : pfad;
@@ -307,6 +344,8 @@
     }
 
     zeichneAuto(g, wagen.x, wagen.y, wagen.a, F.haupt, true);
+    // Bäume zuletzt: die Krone liegt über dem Auto
+    L.hindernisse.forEach(h => { if (h.art === 'baum') baumZeichnen(g, h); });
 
     funken.forEach(f => {
       g.fillStyle = `rgba(255,${180 + Math.random() * 60 | 0},80,${1 - f.t / 0.6})`;
@@ -340,7 +379,7 @@
   }
 
   function hindernis(g, h) {
-    if (h.art === 'auto') return zeichneAuto(g, h.x, h.y, h.a, h.farbe, false);
+    if (h.art === 'auto') return zeichneAuto(g, h.x, h.y, h.a, h.farbe, false, h.bild);
     g.save();
     g.translate(h.x, h.y); g.rotate(h.a);
     if (h.art === 'wand') {
@@ -348,8 +387,24 @@
       g.fillRect(-h.w / 2 + 4, -h.h / 2 + 5, h.w, h.h);
       g.fillStyle = '#80868f';
       g.fillRect(-h.w / 2, -h.h / 2, h.w, h.h);
-      g.fillStyle = '#a3a9b1';
+      if (MAUER.complete && MAUER.naturalWidth) {
+        // Betontextur: läuft immer längs der Mauer, Texturhöhe = Mauerdicke
+        const quer = h.h > h.w, lang = quer ? h.h : h.w, dick = quer ? h.w : h.h;
+        if (!mauerMuster) mauerMuster = g.createPattern(MAUER, 'repeat');
+        g.save();
+        if (quer) g.rotate(P / 2);
+        mauerMuster.setTransform(new DOMMatrix().translate(-lang / 2, -dick / 2).scale(dick / MAUER.naturalHeight));
+        g.fillStyle = mauerMuster;
+        g.fillRect(-lang / 2, -dick / 2, lang, dick);
+        g.restore();
+      }
+      g.fillStyle = 'rgba(255,255,255,.18)';
       g.fillRect(-h.w / 2, -h.h / 2, h.w, Math.min(5, h.h * 0.35));
+    } else if (h.art === 'pylon' && KEGEL.complete && KEGEL.naturalWidth) {
+      // gemalter Leitkegel von oben; Fußplatte etwas größer als die Kollisionsfläche
+      g.fillStyle = 'rgba(0,0,0,.3)';
+      g.fillRect(-14, -12, 32, 32);
+      g.drawImage(KEGEL, -16, -16, 32, 32);
     } else if (h.art === 'pylon') {
       g.fillStyle = 'rgba(0,0,0,.3)';
       g.beginPath(); g.arc(3, 4, 13, 0, P * 2); g.fill();
@@ -364,12 +419,20 @@
   }
 
   // Auto von oben, Front zeigt in Richtung a (0 = nach oben)
-  function zeichneAuto(g, x, y, a, farbe, mitLogo) {
+  function zeichneAuto(g, x, y, a, farbe, mitLogo, bild) {
     const l = AL / 2, b = AB / 2;
     g.save();
     g.translate(x, y); g.rotate(a);
     g.fillStyle = 'rgba(0,0,0,.35)';
     g.beginPath(); g.roundRect(-b + 4, -l + 6, AB, AL, 11); g.fill();
+    const fremd = bild != null && FREMDE[bild];
+    if (!mitLogo && fremd && fremd.complete && fremd.naturalWidth) {
+      // gemaltes Auto: so skaliert, dass es genau so lang ist wie das Auto im Spiel
+      const s = AL / fremd.naturalHeight;
+      g.drawImage(fremd, -fremd.naturalWidth * s / 2, -l, fremd.naturalWidth * s, AL);
+      g.restore();
+      return;
+    }
     if (mitLogo && spielerAuto) {
       const s = AL / BILD_LAENGE, dy = ((DACH[0] + DACH[1]) / 2 - BILD_MITTE) * s, dl = (DACH[1] - DACH[0]) * s;
       g.drawImage(spielerAuto, -spielerAuto.width * s / 2, -BILD_MITTE * s, spielerAuto.width * s, spielerAuto.height * s);
@@ -414,6 +477,21 @@
       anleitung: 'Zieh mit dem Finger eine Linie vom Auto in die markierte Parklücke – das Auto fährt sie nach. Je gerader und mittiger, desto mehr Punkte. Drei Beulen, dann ist Schluss.',
       ende: 'Einparken auf Knopfdruck? Unsere Neuwagen helfen mit Kamera und Parkassistent.',
     },
+    // Aufnahmen (Pixabay Content License); 'crash' ersetzt den erzeugten Ton gleichen Namens
+    klaenge: {
+      crash: { datei: 'klaenge/blechschaden.wav', pegel: 0.5 },
+      tuer: { datei: 'klaenge/tuer-zu.wav', pegel: 0.45 },
+      parksensor: { datei: 'klaenge/parksensor.wav', pegel: 0.28 },
+      motorLeerlauf: { datei: 'klaenge/motor-leerlauf.wav', pegel: 0.25 },
+      motorFahrt: { datei: 'klaenge/motor-fahrt.wav', pegel: 0.3 },
+      parkplatz: { datei: 'klaenge/parkplatz.wav', pegel: 0.12 },
+      handbremse: { datei: 'klaenge/handbremse.wav', pegel: 0.45 },
+      fehler: { datei: 'klaenge/fehler.wav', pegel: 0.3 },
+      sieg: { datei: 'klaenge/sieg.wav', pegel: 0.45 },
+      bestwert: { datei: 'klaenge/bestwert.wav', pegel: 0.4 },
+      klick: { datei: 'klaenge/klick.wav', pegel: 0.35 },
+    },
+    schleife: 'parkplatz',
     neu, schritt, zeichne, runter, bewegen, hoch,
   });
 })();
