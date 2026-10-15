@@ -14,7 +14,7 @@ window.KUNDE = {
 
   // Texte überschreiben (alle optional): titel, untertitel, anleitung, ende, endeTitel
   texte: {
-    anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sechs Fahrzeuge von Corsa bis Vivaro – je größer das Rad, desto kniffliger. Jede falsche Mutter kostet eine Sekunde.',
+    anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sechs Fahrzeuge vom Corsa bis zum Vivaro – je größer das Rad, desto kniffliger. Jede falsche Mutter kostet eine Sekunde.',
     ende: 'Reifenwechsel ohne Stress? Das übernimmt gerne das Autohaus Zeindl in Malching.',
   },
 
