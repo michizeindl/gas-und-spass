@@ -30,26 +30,9 @@
   RAEDER.forEach(r => {
     if (!r.bild) return;
     const img = new Image();
-    img.onload = () => { r.fertig = umfaerben(img); };
+    img.onload = () => { r.fertig = R_.umfaerben(img); };
     img.src = r.bild;
   });
-  function umfaerben(img) {
-    const c = document.createElement('canvas');
-    c.width = img.naturalWidth; c.height = img.naturalHeight;
-    const g = c.getContext('2d');
-    g.drawImage(img, 0, 0);
-    const bild = g.getImageData(0, 0, c.width, c.height), d = bild.data;
-    const h = parseInt(F.haupt.replace('#', ''), 16), ziel = [(h >> 16) & 255, (h >> 8) & 255, h & 255];
-    for (let i = 0; i < d.length; i += 4) {
-      const gruen = d[i + 1] - Math.max(d[i], d[i + 2]);
-      if (gruen < 30) continue;
-      const t = Math.min(1, (gruen - 30) / 90);  // Kanten weich überblenden
-      const hell = Math.min(1.3, d[i + 1] / 210);  // Licht und Schatten des Sattels bleiben erhalten
-      for (let k = 0; k < 3; k++) d[i + k] += (Math.min(255, ziel[k] * hell) - d[i + k]) * t;
-    }
-    g.putImageData(bild, 0, 0);
-    return c;
-  }
 
   // Anzugsreihenfolge über Kreuz, wie in der Werkstatt (Lochpositionen im Uhrzeigersinn)
   const KREUZ = { 4: [0, 2, 1, 3], 5: [0, 2, 4, 1, 3], 6: [0, 3, 1, 4, 2, 5] };

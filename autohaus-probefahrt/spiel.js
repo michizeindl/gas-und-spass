@@ -6,10 +6,31 @@
   const SCHRIFT = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
   const P = Math.PI;
   // Maße in Einheiten: eine Spur ist 100 breit, k rechnet in Bildpunkte um
-  const SPUREN = 3, AB = 46, AL = 88;
+  const SPUREN = 3, AB = 40, AL = 92;
   const TEMPO_START = 420, TEMPO_MAX = 1000, TEMPO_PLUS = 11; // Einheiten pro Sekunde (Zuwachs pro Sekunde)
   const LEBEN = 3, MUENZE = 25;
-  const FARBEN = ['#5c6bc0', '#26a69a', '#8d6e63', '#eceff1', '#455a64', '#7e57c2', '#c0ca33', '#29b6f6'];
+  // Aktuelle Opel-Lackfarben (Corsa, Mokka, Grandland laut carwow.de, Okt. 2026); Farbwerte nachempfunden, nicht offiziell.
+  // Kein Gelb: das eigene Auto hat die Kundenfarbe.
+  const FARBEN = [
+    '#f2f3f1', // Arktis Weiß
+    '#b9bdc0', // Kristall Silber
+    '#5f6366', // Grafik Grau
+    '#e2622f', // Koral Orange
+    '#1d1f22', // Karbon Schwarz
+    '#2f63c6', // Voltaik Blau
+    '#7d8287', // Kontrast Grau
+    '#2e7d6b', // Tropikal Grün
+    '#9a5a3c', // Impakt Kupfer
+    '#2a4f8f', // Spektrum Blau
+    '#e6e6e1', // Kontur Weiß
+    '#6f8f7c', // Eukalyptus Grün
+  ];
+  // Eigenes Auto: gemalt von oben (Front oben), grüne Karosserie wird in die Kundenfarbe umgefärbt.
+  // Am Bild abgemessen: Auto 1686 px lang, Mitte bei y 887, Dach von y 632 bis 1360.
+  const SPIELERAUTO = new Image(), BILD_LAENGE = 1686, BILD_MITTE = 887, DACH = [632, 1360];
+  let spielerAuto = null;
+  SPIELERAUTO.onload = () => { spielerAuto = R_.umfaerben(SPIELERAUTO); };
+  SPIELERAUTO.src = 'bilder/auto-spieler.webp';
 
   let spur, spurX, tempo, strecke, muenzen, leben, dinge, deko, abstand, schutz, phase, phaseT, meldungen, wackeln, rutschen;
   let k = 1, strasseX = 0, strasseB = 300, autoY = 0, B = 0, H = 0;
@@ -251,6 +272,16 @@
     g.translate(x, y); g.rotate(kipp || 0);
     g.fillStyle = 'rgba(0,0,0,.35)';
     g.beginPath(); g.roundRect(-b + 4 * k, -l + 6 * k, b * 2, l * 2, r); g.fill();
+    if (mitLogo && spielerAuto) {
+      const s = AL * k / BILD_LAENGE, dy = ((DACH[0] + DACH[1]) / 2 - BILD_MITTE) * s, dl = (DACH[1] - DACH[0]) * s;
+      g.drawImage(spielerAuto, -spielerAuto.width * s / 2, -BILD_MITTE * s, spielerAuto.width * s, spielerAuto.height * s);
+      // Logo längs aufs Dach (von hinten nach vorne lesbar)
+      g.save(); g.translate(0, dy); g.rotate(-Math.PI / 2);
+      R_.zeichneLogo(g, -dl * 0.42, -b * 0.4, dl * 0.84, b * 0.8, null, R_.textFarbe(farbe) !== '#ffffff');
+      g.restore();
+      g.restore();
+      return;
+    }
     g.fillStyle = R_.toenen(farbe, -0.3);
     g.fillRect(-b - 5 * k, -l * 0.3, 6 * k, 8 * k); g.fillRect(b - k, -l * 0.3, 6 * k, 8 * k);
     const kg = g.createLinearGradient(-b, 0, b, 0);

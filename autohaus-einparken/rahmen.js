@@ -58,6 +58,25 @@
     g.restore();
   }
 
+  // Gemalte Bilder: grüne Flächen (#00FF00 bzw. kräftiges Grün) in die Kundenfarbe umfärben,
+  // Licht und Schatten bleiben erhalten. Gibt eine Leinwand zurück, die wie ein Bild gezeichnet werden kann.
+  function umfaerben(img, farbe) {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    const bild = g.getImageData(0, 0, c.width, c.height), d = bild.data, ziel = rgb(farbe || farben.haupt);
+    for (let i = 0; i < d.length; i += 4) {
+      const gruen = d[i + 1] - Math.max(d[i], d[i + 2]);
+      if (gruen < 16) continue;
+      const t = Math.min(1, (gruen - 16) / 36);    // Kanten weich überblenden, auch dunkles Grün ganz erfassen
+      const hell = Math.min(1.3, d[i + 1] / 210);    // Licht und Schatten bleiben erhalten
+      for (let k = 0; k < 3; k++) d[i + k] += (Math.min(255, ziel[k] * hell) - d[i + k]) * t;
+    }
+    g.putImageData(bild, 0, 0);
+    return c;
+  }
+
   // ---------- Klang ----------
   // Alle Töne werden im Browser erzeugt, es gibt keine Tondateien.
   let ac = null;
@@ -347,7 +366,7 @@
 
   // ---------- Schnittstelle für die Spiele ----------
   window.Rahmen = {
-    kunde: K, farben, textFarbe, toenen, mitAlpha,
+    kunde: K, farben, textFarbe, toenen, mitAlpha, umfaerben,
     zeichneLogo, get logoBereit() { return logoBereit; },
     ton, ende, anzeige,
     get zustand() { return zustand; },

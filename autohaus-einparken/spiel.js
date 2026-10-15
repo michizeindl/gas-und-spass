@@ -6,11 +6,25 @@
   const SCHRIFT = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
   const P = Math.PI;
   const W = 600, HW = 900;   // Spielwelt in Einheiten (hochkant); im Querformat wird sie gedreht
-  const AL = 86, AB = 44;    // Länge und Breite eines Autos
+  const AL = 92, AB = 40;    // Länge und Breite eines Autos (Verhältnis wie beim gemalten Auto)
   const TEMPO = 230;         // Einheiten pro Sekunde
   const LEBEN = 3;
-  const FARBEN = ['#5c6bc0', '#26a69a', '#8d6e63', '#eceff1', '#455a64', '#ef6c00', '#7e57c2', '#c0ca33'];
-
+  // Aktuelle Opel-Lackfarben (Corsa, Mokka, Grandland laut carwow.de, Okt. 2026); Farbwerte nachempfunden, nicht offiziell.
+  // Kein Gelb: das eigene Auto hat die Kundenfarbe.
+  const FARBEN = [
+    '#f2f3f1', // Arktis Weiß
+    '#b9bdc0', // Kristall Silber
+    '#5f6366', // Grafik Grau
+    '#e2622f', // Koral Orange
+    '#1d1f22', // Karbon Schwarz
+    '#2f63c6', // Voltaik Blau
+    '#7d8287', // Kontrast Grau
+    '#2e7d6b', // Tropikal Grün
+    '#9a5a3c', // Impakt Kupfer
+    '#2a4f8f', // Spektrum Blau
+    '#e6e6e1', // Kontur Weiß
+    '#6f8f7c', // Eukalyptus Grün
+  ];
   // ---------- Parkplätze ----------
   // a = Drehung: 0 = Auto zeigt nach oben, P/2 = nach rechts
   const auto = (x, y, a) => ({ art: 'auto', x, y, w: AB, h: AL, a: a || 0 });
@@ -36,6 +50,18 @@
 
   let lv, wagen, pfad, route, strecke, zeichnet, phase, phaseT, leben, punkte, meldung, wackeln, funken, schonGezogen;
   let ansicht = new DOMMatrix(), umkehr = new DOMMatrix();
+
+  // Pflaster-Bild: enthält genau 5 × 4 Steinmuster; 130 Einheiten breit = ein Stein gut halb so breit wie ein Auto
+  const PFLASTER = new Image(), PFLASTER_BREITE = 130;
+  PFLASTER.src = 'bilder/pflaster.webp';
+  let pflasterMuster = null;
+
+  // Eigenes Auto: gemalt von oben (Front oben), grüne Karosserie wird in die Kundenfarbe umgefärbt.
+  // Am Bild abgemessen: Auto 1686 px lang, Mitte bei y 887, Dach von y 632 bis 1360.
+  const SPIELERAUTO = new Image(), BILD_LAENGE = 1686, BILD_MITTE = 887, DACH = [632, 1360];
+  let spielerAuto = null;
+  SPIELERAUTO.onload = () => { spielerAuto = R_.umfaerben(SPIELERAUTO); };
+  SPIELERAUTO.src = 'bilder/auto-spieler.webp';
 
   function neu() {
     lv = 0; leben = LEBEN; punkte = 0; schonGezogen = false;
@@ -212,9 +238,21 @@
     g.save();
     g.transform(ansicht.a, ansicht.b, ansicht.c, ansicht.d, ansicht.e, ansicht.f);
     const L = LEVEL[lv];
-    // Asphalt mit Bordstein
+    // Boden: Pflaster vom Hof des Autohauses (nahtlos gekachelt, abgedunkelt für gute Sicht auf die Linien);
+    // solange das Bild fehlt, grauer Asphalt
     g.fillStyle = '#3b4048';
     g.fillRect(0, 0, W, HW);
+    if (PFLASTER.complete && PFLASTER.naturalWidth) {
+      if (!pflasterMuster) {
+        pflasterMuster = g.createPattern(PFLASTER, 'repeat');
+        pflasterMuster.setTransform(new DOMMatrix().scale(PFLASTER_BREITE / PFLASTER.naturalWidth));
+      }
+      g.fillStyle = pflasterMuster;
+      g.fillRect(0, 0, W, HW);
+      g.fillStyle = 'rgba(15,17,20,.38)';
+      g.fillRect(0, 0, W, HW);
+    }
+    // Bordstein
     g.strokeStyle = '#a7adb4'; g.lineWidth = 10;
     g.strokeRect(-5, -5, W + 10, HW + 10);
     // Logo auf den Boden gemalt
@@ -332,6 +370,16 @@
     g.translate(x, y); g.rotate(a);
     g.fillStyle = 'rgba(0,0,0,.35)';
     g.beginPath(); g.roundRect(-b + 4, -l + 6, AB, AL, 11); g.fill();
+    if (mitLogo && spielerAuto) {
+      const s = AL / BILD_LAENGE, dy = ((DACH[0] + DACH[1]) / 2 - BILD_MITTE) * s, dl = (DACH[1] - DACH[0]) * s;
+      g.drawImage(spielerAuto, -spielerAuto.width * s / 2, -BILD_MITTE * s, spielerAuto.width * s, spielerAuto.height * s);
+      // Logo längs aufs Dach (von hinten nach vorne lesbar)
+      g.save(); g.translate(0, dy); g.rotate(-Math.PI / 2);
+      R_.zeichneLogo(g, -dl * 0.42, -AB * 0.2, dl * 0.84, AB * 0.4, null, R_.textFarbe(farbe) !== '#ffffff');
+      g.restore();
+      g.restore();
+      return;
+    }
     // Spiegel
     g.fillStyle = R_.toenen(farbe, -0.3);
     g.fillRect(-b - 5, -l * 0.3, 6, 8); g.fillRect(b - 1, -l * 0.3, 6, 8);
