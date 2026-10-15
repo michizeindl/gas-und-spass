@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spiele</title>
+<!-- App-Icon „Gas & Spaß“ (Startbildschirm, Browser-Tab) -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0d0d0d">
+<meta name="apple-mobile-web-app-title" content="Gas & Spaß">
+<style>
+  /* Startseite: Logo oben, darunter die Spiele als Kacheln. Farben kommen aus kunde/kunde.js. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: radial-gradient(ellipse at 50% 0%, #2a2a2a 0%, var(--dunkel) 65%);
+    color: var(--hell); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center; padding: 28px 16px 24px; min-height: 100vh;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .logo { width: min(320px, 78vw); height: auto; display: block; margin: 8px auto 52px; }
+  /* Kopf als Fläche in der Hausfarbe: Name groß, Unterzeile klein */
+  .kopf {
+    width: 100%; max-width: 980px; margin: 0 0 20px; padding: 14px 16px 15px; border-radius: 22px;
+    background: var(--haupt); color: var(--haupt-text); text-align: center;
+  }
+  h1 { margin: 0; font-size: clamp(30px, 9vw, 44px); line-height: 1.05; font-weight: 900; letter-spacing: .5px; }
+  /* 3D-Schrift: Lichtkante oben links, nach rechts unten herausgezogene Tiefe in dunklerer Hausfarbe, weicher Schatten */
+  .kopf h1 {
+    --tiefe: color-mix(in srgb, var(--haupt) 65%, #000);
+    text-shadow:
+      1px 1px 0 var(--tiefe), 2px 2px 0 var(--tiefe),
+      3px 4px 5px rgba(0,0,0,.25);
+    transform: translate(-1px, -1px);
+  }
+  .unter { margin: 4px 0 0; font-size: clamp(14px, 4vw, 17px); font-weight: 600; }
+  .unter:empty { display: none; }
+  .balken { width: 100%; max-width: 980px; height: 6px; border-radius: 3px; background: var(--haupt); }
+  .balken.unten { margin-top: 20px; }
+  .spiele { display: grid; gap: 14px; width: 100%; max-width: 980px; grid-template-columns: 1fr; }
+  @media (min-width: 720px) { .spiele { grid-template-columns: repeat(3, 1fr); } }
+  .spiel {
+    display: flex; align-items: center; gap: 16px; padding: 16px; border-radius: 18px;
+    background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.1);
+    color: inherit; text-decoration: none; transition: transform .12s, border-color .12s, background .12s;
+  }
+  @media (min-width: 720px) { .spiel { flex-direction: column; text-align: center; padding: 26px 18px 22px; } }
+  .spiel:hover, .spiel:focus-visible { border-color: var(--haupt); background: rgba(255,255,255,.09); transform: translateY(-2px); outline: none; }
+  .spiel:active { transform: scale(.98); }
+  .icon {
+    flex: none; width: 84px; height: 84px; border-radius: 22px; display: grid; place-items: center;
+    background: var(--haupt); color: var(--haupt-text); box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  }
+  @media (min-width: 720px) { .icon { width: 112px; height: 112px; border-radius: 28px; } .kopf { border-radius: 28px; } }
+  .icon svg { width: 66%; height: 66%; }
+  .name { font-size: 20px; font-weight: 800; margin: 0 0 3px; }
+  .text { margin: 0; font-size: 14px; opacity: .75; line-height: 1.35; }
+  .best { margin: 6px 0 0; font-size: 13px; color: var(--akzent); font-weight: 700; }
+  .best:empty { display: none; }
+  #tonKnopf {
+    position: fixed; top: 10px; right: 10px; width: 40px; height: 40px; border-radius: 50%; border: 0; padding: 0;
+    background: rgba(255,255,255,.12); color: #fff; cursor: pointer; display: grid; place-items: center;
+  }
+  #tonKnopf svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  footer { margin-top: auto; padding-top: 24px; font-size: 12px; opacity: .45; text-align: center; }
+</style>
+</head>
+<body>
+<img class="logo" alt="">
+<header class="kopf">
+  <h1 class="titel"></h1>
+  <p class="unter"></p>
+</header>
+
+<nav class="spiele">
+  <a class="spiel" href="autohaus-boxenstopp/" data-id="autohaus-boxenstopp" data-format="sekunden">
+    <span class="icon" aria-hidden="true">
+      <!-- Rad: Reifen mit Profil, Felge mit fünf Speichen, Nabe -->
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-linecap="round">
+        <circle cx="32" cy="32" r="25" stroke-width="10"/>
+        <circle cx="32" cy="32" r="28.6" stroke="var(--haupt)" stroke-width="2.4" stroke-dasharray="2.6 3.4" stroke-linecap="butt"/>
+        <circle cx="32" cy="32" r="16.5" stroke-width="2.6"/>
+        <path stroke-width="4.6" d="M32 25V16.5M38.66 29.84l8.08-2.63M36.12 37.66l4.99 6.88M27.88 37.66l-4.99 6.88M25.34 29.84l-8.08-2.63"/>
+        <circle cx="32" cy="32" r="5.6" fill="currentColor" stroke="none"/>
+      </svg>
+    </span>
+    <span>
+      <p class="name">Boxenstopp</p>
+      <p class="text">Radmuttern über Kreuz festziehen – vom Corsa bis zum Vivaro.</p>
+      <p class="best"></p>
+    </span>
+  </a>
+
+  <a class="spiel" href="autohaus-einparken/" data-id="autohaus-einparken" data-format="punkte">
+    <span class="icon" aria-hidden="true">
+      <!-- Parkplatz-P -->
+      <svg viewBox="0 0 64 64">
+        <text x="33" y="54" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="62" font-weight="900" fill="currentColor">P</text>
+      </svg>
+    </span>
+    <span>
+      <p class="name">Einpark-Profi</p>
+      <p class="text">Linie ziehen und in jede Lücke einparken – ohne Beule.</p>
+      <p class="best"></p>
+    </span>
+  </a>
+
+  <a class="spiel" href="autohaus-probefahrt/" data-id="autohaus-probefahrt" data-format="punkte">
+    <span class="icon" aria-hidden="true">
+      <!-- Straße mit Auto -->
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6 8 58M46 6l10 52"/>
+        <path d="M32 8v6M32 22v6" />
+        <rect x="23" y="34" width="18" height="24" rx="5"/>
+        <path d="M26 41h12"/>
+      </svg>
+    </span>
+    <span>
+      <p class="name">Probefahrt</p>
+      <p class="text">Spur wechseln, ausweichen, Münzen sammeln.</p>
+      <p class="best"></p>
+    </span>
+  </a>
+</nav>
+<div class="balken unten"></div>
+
+<footer class="fuss"></footer>
+<button id="tonKnopf" type="button" aria-label="Musik an oder aus"></button>
+
+<script src="kunde/kunde.js"></script>
+<script>
+  // Farben, Logo und Texte aus kunde/kunde.js übernehmen; Bestwerte aus den Spielen anzeigen
+  (function () {
+    'use strict';
+    const K = window.KUNDE || {}, F = Object.assign({ haupt: '#d32f2f', akzent: '#ffb300', dunkel: '#151922', hell: '#ffffff' }, K.farben);
+    const s = document.documentElement.style;
+    const n = parseInt(F.haupt.replace('#', ''), 16), hell = (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) > 150;
+    s.setProperty('--haupt', F.haupt); s.setProperty('--haupt-text', hell ? '#111' : '#fff');
+    s.setProperty('--akzent', F.akzent); s.setProperty('--dunkel', F.dunkel); s.setProperty('--hell', F.hell);
+    const T = K.texte || {};
+    document.querySelector('.logo').src = K.logo || 'kunde/logo.svg';
+    document.querySelector('.logo').alt = K.firma || '';
+    document.querySelector('.titel').textContent = T.titel || 'Spiele';
+    document.querySelector('.unter').textContent = T.untertitel || '';
+    document.querySelector('.fuss').textContent = K.firma ? '© ' + K.firma : '';
+    document.title = (T.titel || 'Spiele') + (K.firma ? ' – ' + K.firma : '');
+    document.querySelectorAll('.spiel').forEach(a => {
+      let b = null;
+      try { b = localStorage.getItem('mg:best:' + a.dataset.id + ':' + (K.firma || '')); } catch (e) { /* privat */ }
+      if (b == null) return;
+      a.querySelector('.best').textContent = 'Dein Bestwert: ' +
+        (a.dataset.format === 'sekunden' ? (+b).toFixed(1).replace('.', ',') + ' s' : b + ' Punkte');
+    });
+
+    // Menü-Musik (Pixabay, „Chiptune Level Up“ von desifreemusic, Nr. 610664), auf 20 s gekürzt und
+    // läuft einmal beim Öffnen des Menüs und wird am Ende sanft ausgeblendet (Nutzerwunsch: keine Endlosschleife).
+    // Browser spielen erst nach dem ersten Tippen ab; Ton an/aus gilt auch für die Spiele (mg:ton).
+    const SYM_AN = '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>';
+    const SYM_AUS = '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
+    const PEGEL = 0.35, AUSBLENDEN = 2;   // Lautstärke, Sekunden zum Ausblenden am Ende
+    const musik = new Audio('klaenge/menue.wav');
+    musik.volume = PEGEL;
+    let tonAn = true, gespielt = false;
+    try { tonAn = localStorage.getItem('mg:ton') !== 'aus'; } catch (e) { /* privat */ }
+    const knopf = document.getElementById('tonKnopf');
+    const symbol = () => { knopf.innerHTML = tonAn ? SYM_AN : SYM_AUS; };
+    function blenden() {
+      if (musik.paused) return;
+      const rest = musik.duration - musik.currentTime;
+      musik.volume = PEGEL * Math.max(0, Math.min(1, rest / AUSBLENDEN));
+      requestAnimationFrame(blenden);
+    }
+    musik.addEventListener('playing', () => { gespielt = true; blenden(); });
+    const spielen = () => { if (tonAn && !gespielt && musik.paused) musik.play().catch(() => {}); };
+    symbol();
+    spielen();                                                     // klappt, wenn der Browser es schon erlaubt
+    ['pointerdown', 'keydown', 'touchstart'].forEach(e => addEventListener(e, spielen, { passive: true }));
+    knopf.addEventListener('click', () => {
+      tonAn = !tonAn;
+      try { localStorage.setItem('mg:ton', tonAn ? 'an' : 'aus'); } catch (e) { /* privat */ }
+      symbol();
+      if (tonAn) { gespielt = false; musik.currentTime = 0; musik.volume = PEGEL; spielen(); }   // auf Wunsch noch einmal
+      else musik.pause();
+    });
+  })();
+</script>
+</body>
+</html>
