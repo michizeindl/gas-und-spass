@@ -77,7 +77,7 @@
     if (b.complete && b.naturalWidth) { g.drawImage(b, h.x - h.d / 2, h.y - h.d / 2, h.d, h.d); return; }
     g.fillStyle = '#3d6b35'; g.beginPath(); g.arc(h.x, h.y, h.d / 2, 0, P * 2); g.fill();   // ohne Bild: grüne Krone
   }
-  const motorLeerlauf = R_.dauerton('motorLeerlauf'), motorFahrt = R_.dauerton('motorFahrt');
+  const motorLeerlauf = R_.dauerton('motorLeerlauf'), motorFahrt = R_.dauerton('motorFahrt'), voegel = R_.dauerton('parkplatz');
   SPIELERAUTO.onload = () => { spielerAuto = R_.umfaerben(SPIELERAUTO); };
   SPIELERAUTO.src = 'bilder/auto-spieler.webp';
 
@@ -212,6 +212,7 @@
       } else { lv++; neuerVersuch(); }
     }
     // Motor: Leerlauf, solange man die Linie zieht; beim Fahren dreht er je nach Tempo höher
+    voegel.stellen(phase === 'aus' ? 0 : 1);   // Vögel auf dem Hof, leise unter der Musik
     motorLeerlauf.stellen(phase === 'zeichnen' ? 1 : phase === 'fahren' ? 0.35 : 0);
     motorFahrt.stellen(phase === 'fahren' ? 1 : 0, 0.8 + tempo / TEMPO * 0.45);
     if (meldung) meldung.t += dt;
@@ -251,7 +252,7 @@
     if (!ecken(wagenBox()).every(p => innen(p, z, 3))) {
       phase = 'daneben'; phaseT = 0;
       meldung = { text: 'Nicht ganz drin – nochmal!', farbe: '#fff', t: 0 };
-      R_.ton('fehler');
+      R_.ton('hupe');
       return;
     }
     const versatz = Math.hypot(wagen.x - z.x, wagen.y - z.y);
@@ -485,13 +486,14 @@
       motorLeerlauf: { datei: 'klaenge/motor-leerlauf.wav', pegel: 0.25 },
       motorFahrt: { datei: 'klaenge/motor-fahrt.wav', pegel: 0.3 },
       parkplatz: { datei: 'klaenge/parkplatz.wav', pegel: 0.12 },
+      musik: { datei: 'klaenge/musik.wav', pegel: 0.08 },   // leise Hintergrundmusik (Pixabay, bombinsound)
       handbremse: { datei: 'klaenge/handbremse.wav', pegel: 0.45 },
-      fehler: { datei: 'klaenge/fehler.wav', pegel: 0.3 },
+      hupe: { datei: 'klaenge/hupe.wav', pegel: 0.35 },   // falsch geparkt
       sieg: { datei: 'klaenge/sieg.wav', pegel: 0.45 },
       bestwert: { datei: 'klaenge/bestwert.wav', pegel: 0.4 },
       klick: { datei: 'klaenge/klick.wav', pegel: 0.35 },
     },
-    schleife: 'parkplatz',
+    schleife: 'musik',
     neu, schritt, zeichne, runter, bewegen, hoch,
   });
 })();
