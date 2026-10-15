@@ -14,7 +14,8 @@ window.KUNDE = {
 
   // Texte überschreiben (alle optional): titel, untertitel, anleitung, ende, endeTitel
   texte: {
-    ende: 'Reifenwechsel ohne Stress? Das übernimmt die Werkstatt vom Autohaus Zeindl in Malching.',
+    anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sechs Fahrzeuge vom Corsa bis zum Vivaro – je größer das Rad, desto kniffliger. Jede falsche Mutter kostet eine Sekunde.',
+    ende: 'Reifenwechsel ohne Stress? Das übernimmt gerne das Autohaus Zeindl in Malching.',
   },
 
   // Fahrzeuge der sechs Runden, vom kleinsten zum größten Rad
@@ -25,5 +26,5 @@ window.KUNDE = {
   startseite: '../',
 
   // Knopf am Ende (ohne link wird er nicht gezeigt)
-  knopf: { text: 'Zum Autohaus Zeindl', link: 'https://www.auto-zeindl.de/' },
+  knopf: { text: 'Zur Website', link: 'https://www.auto-zeindl.de/' },
 };

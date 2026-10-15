@@ -44,6 +44,14 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 .karte .bestwert { margin: 0 0 14px; font-size: 14px; opacity: .75; }
 .karte .bestwert.neu { opacity: 1; color: var(--akzent); font-weight: 700; }
 .karte .text { margin: 0 0 16px; font-size: 15px; line-height: 1.4; }
+/* Endbild: Bewertung („Profi-Mechaniker!“) als schräges Band über der oberen Kante */
+#endSchirm .karte { position: relative; margin-top: 18px; padding-top: 30px; }
+#endSchirm .ueberschrift {
+  position: absolute; left: 50%; top: -17px; transform: translateX(-50%) rotate(-3deg);
+  max-width: 92%; margin: 0; padding: 6px 18px; border-radius: 6px;
+  background: var(--haupt); color: var(--haupt-text); font-size: 19px; font-weight: 900; line-height: 1.2;
+  box-shadow: 0 4px 10px rgba(0,0,0,.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .karte .quellen { margin: 12px 0 0; font-size: 11px; line-height: 1.35; opacity: .5; }
 .karte .quellen:empty { display: none; }
 .knopf {
@@ -52,7 +60,54 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
   font: inherit; font-size: 17px; font-weight: 700; text-decoration: none; cursor: pointer;
 }
 .knopf.zweit { background: transparent; color: var(--hell); }
-.knopf:active { transform: translateY(1px); }
+
+/* ---------- Animationen (dezent) ---------- */
+/* Start- und Endbild: Logo springt herein und schwebt leicht, der Rest gleitet nacheinander hoch */
+@keyframes einGleiten { from { opacity: 0; transform: translateY(14px); } }
+@keyframes logoRein {
+  0% { opacity: 0; transform: scale(.7) rotate(-4deg); }
+  60% { opacity: 1; transform: scale(1.06) rotate(1deg); }
+  100% { transform: none; }
+}
+@keyframes schweben { 50% { transform: translateY(-4px); } }
+@keyframes atmen { 50% { transform: scale(1.035); } }
+@keyframes glanz { from { left: -60%; } to { left: 130%; } }
+@keyframes bandRein {
+  0% { opacity: 0; transform: translateX(-50%) rotate(-14deg) scale(1.7); }
+  70% { opacity: 1; transform: translateX(-50%) rotate(-1deg) scale(.95); }
+  100% { transform: translateX(-50%) rotate(-3deg); }
+}
+.schirm:not([hidden]) .karte { animation: einGleiten .35s ease-out both; }
+.schirm:not([hidden]) .karte > :not(.logo):not(.ueberschrift) { animation: einGleiten .45s ease-out both; }
+.schirm:not([hidden]) .karte > :nth-child(2) { animation-delay: .12s; }
+.schirm:not([hidden]) .karte > :nth-child(3) { animation-delay: .19s; }
+.schirm:not([hidden]) .karte > :nth-child(4) { animation-delay: .26s; }
+.schirm:not([hidden]) .karte > :nth-child(5) { animation-delay: .33s; }
+.schirm:not([hidden]) .karte > :nth-child(6) { animation-delay: .40s; }
+.schirm:not([hidden]) .karte > :nth-child(7) { animation-delay: .47s; }
+.schirm:not([hidden]) .karte > :nth-child(n+8) { animation-delay: .54s; }
+.schirm:not([hidden]) .karte .logo { animation: logoRein .7s cubic-bezier(.2,.9,.3,1.3) both, schweben 4s 1s ease-in-out infinite; }
+#endSchirm:not([hidden]) .ueberschrift { animation: bandRein .6s .25s cubic-bezier(.2,.9,.3,1.2) both; }
+
+/* Knöpfe: heben sich beim Überfahren, geben beim Drücken nach; der Hauptknopf „atmet“ und glänzt */
+.knopf { position: relative; overflow: hidden; transition: transform .15s, box-shadow .15s, background-color .15s; }
+.knopf:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.35); }
+.knopf.zweit:hover { background: rgba(255,255,255,.06); }
+.knopf:active { transform: scale(.97); box-shadow: none; }
+.schirm:not([hidden]) .knopf:not(.zweit) { animation: einGleiten .45s .4s ease-out both, atmen 2.4s 1.2s ease-in-out infinite; }
+.knopf:not(.zweit)::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+  animation: glanz 3.2s 1.5s ease-in-out infinite;
+}
+#anzeige button, #anzeige a { transition: transform .15s, background-color .15s; }
+#anzeige button:hover, #anzeige a:hover { transform: scale(1.1); background: rgba(0,0,0,.5); }
+#anzeige button:active, #anzeige a:active { transform: scale(.92); }
+
+/* Wer weniger Bewegung eingestellt hat, bekommt keine Animationen */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
 
 /* Kleine Fenster (z. B. flach eingebettet): alles kompakter */
 @media (max-height: 520px) {

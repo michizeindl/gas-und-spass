@@ -65,6 +65,34 @@
   }
   #tonKnopf svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   footer { margin-top: auto; padding-top: 24px; font-size: 12px; opacity: .45; text-align: center; }
+
+  /* ---------- Animationen (dezent) ---------- */
+  @keyframes einGleiten { from { opacity: 0; transform: translateY(16px); } }
+  @keyframes logoRein {
+    0% { opacity: 0; transform: scale(.7) rotate(-4deg); }
+    60% { opacity: 1; transform: scale(1.06) rotate(1deg); }
+    100% { transform: none; }
+  }
+  @keyframes schweben { 50% { transform: translateY(-5px); } }
+  @keyframes kopfRein { 0% { opacity: 0; transform: scaleX(.6); } 70% { opacity: 1; transform: scaleX(1.03); } 100% { transform: none; } }
+  @keyframes wackeln { 25% { transform: rotate(-8deg) scale(1.06); } 75% { transform: rotate(8deg) scale(1.06); } }
+  @keyframes drehen { to { transform: rotate(360deg); } }
+  .logo { animation: logoRein .8s cubic-bezier(.2,.9,.3,1.3) both, schweben 4s 1.2s ease-in-out infinite; }
+  .kopf { animation: kopfRein .55s .25s cubic-bezier(.2,.9,.3,1.2) both; }
+  .spiel { animation: einGleiten .5s ease-out both; }
+  .spiel:nth-child(1) { animation-delay: .45s; }
+  .spiel:nth-child(2) { animation-delay: .55s; }
+  .spiel:nth-child(3) { animation-delay: .65s; }
+  .balken.unten { animation: kopfRein .5s .8s ease-out both; }
+  .spiel:hover .icon { animation: wackeln .5s ease-in-out; }
+  .spiel:first-child:hover .icon svg { animation: drehen 1s ease-in-out; }   /* das Rad dreht sich */
+  .spiel:hover .icon { box-shadow: 0 8px 22px rgba(0,0,0,.45); }
+  #tonKnopf { transition: transform .15s, background-color .15s; }
+  #tonKnopf:hover { transform: scale(1.1); background: rgba(255,255,255,.2); }
+  #tonKnopf:active { transform: scale(.92); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>

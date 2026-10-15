@@ -212,7 +212,7 @@
       g.fillRect(0, h * 0.4 - fs, b, fs * 2);
       g.font = `900 ${fs}px ${SCHRIFT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = los ? F.akzent : '#fff';
-      g.fillText(los ? 'LOS!' : 'Bereit …', b / 2, h * 0.4 + 2);
+      g.fillText(los ? 'LOS!' : 'Bereit…', b / 2, h * 0.4 + 2);
       g.restore();
     }
     // Hinweis zur Steuerung in den ersten Sekunden

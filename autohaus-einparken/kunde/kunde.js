@@ -21,5 +21,5 @@ window.KUNDE = {
   startseite: '../',
 
   // Knopf am Ende (ohne link wird er nicht gezeigt)
-  knopf: { text: 'Zum Autohaus Zeindl', link: 'https://www.auto-zeindl.de/' },
+  knopf: { text: 'Zur Website', link: 'https://www.auto-zeindl.de/' },
 };

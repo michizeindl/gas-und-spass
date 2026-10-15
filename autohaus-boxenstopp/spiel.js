@@ -430,7 +430,7 @@
     texte: {
       titel: 'Boxenstopp',
       untertitel: 'Wie schnell wechselst du die Räder?',
-      anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3 … an. Sechs Fahrzeuge vom Kleinwagen bis zum Transporter – je größer das Rad, desto kniffliger. Jede falsche Mutter kostet eine Sekunde.',
+      anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sechs Fahrzeuge vom Kleinwagen bis zum Transporter – je größer das Rad, desto kniffliger. Jede falsche Mutter kostet eine Sekunde.',
       ende: 'Reifenwechsel ohne Stress? Das übernimmt unsere Werkstatt für dich.',
     },
     // Aufnahmen: Pixabay Content License; Werkstatt-Geräusch von Freesound (CC BY 3.0, Namensnennung in quellen)
