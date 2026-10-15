@@ -69,7 +69,6 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
   60% { opacity: 1; transform: scale(1.06) rotate(1deg); }
   100% { transform: none; }
 }
-@keyframes schweben { 50% { transform: translateY(-4px); } }
 @keyframes atmen { 50% { transform: scale(1.035); } }
 @keyframes glanz { from { left: -60%; } to { left: 130%; } }
 @keyframes bandRein {
@@ -86,7 +85,7 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 .schirm:not([hidden]) .karte > :nth-child(6) { animation-delay: .40s; }
 .schirm:not([hidden]) .karte > :nth-child(7) { animation-delay: .47s; }
 .schirm:not([hidden]) .karte > :nth-child(n+8) { animation-delay: .54s; }
-.schirm:not([hidden]) .karte .logo { animation: logoRein .7s cubic-bezier(.2,.9,.3,1.3) both, schweben 4s 1s ease-in-out infinite; }
+.schirm:not([hidden]) .karte .logo { animation: logoRein .7s cubic-bezier(.2,.9,.3,1.3) both; }
 #endSchirm:not([hidden]) .ueberschrift { animation: bandRein .6s .25s cubic-bezier(.2,.9,.3,1.2) both; }
 
 /* Knöpfe: heben sich beim Überfahren, geben beim Drücken nach; der Hauptknopf „atmet“ und glänzt */

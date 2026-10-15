@@ -20,7 +20,7 @@
     display: flex; flex-direction: column; align-items: center; padding: 28px 16px 24px; min-height: 100vh;
     -webkit-tap-highlight-color: transparent;
   }
-  .logo { width: min(320px, 78vw); height: auto; display: block; margin: 8px auto 52px; }
+  .logo { width: min(224px, 55vw); height: auto; display: block; margin: 8px auto 52px; }
   /* Kopf als Fläche in der Hausfarbe: Name groß, Unterzeile klein */
   .kopf {
     width: 100%; max-width: 980px; margin: 0 0 20px; padding: 14px 16px 15px; border-radius: 22px;
@@ -73,16 +73,16 @@
     60% { opacity: 1; transform: scale(1.06) rotate(1deg); }
     100% { transform: none; }
   }
-  @keyframes schweben { 50% { transform: translateY(-5px); } }
   @keyframes kopfRein { 0% { opacity: 0; transform: scaleX(.6); } 70% { opacity: 1; transform: scaleX(1.03); } 100% { transform: none; } }
   @keyframes wackeln { 25% { transform: rotate(-8deg) scale(1.06); } 75% { transform: rotate(8deg) scale(1.06); } }
   @keyframes drehen { to { transform: rotate(360deg); } }
-  .logo { animation: logoRein .8s cubic-bezier(.2,.9,.3,1.3) both, schweben 4s 1.2s ease-in-out infinite; }
+  .logo { animation: logoRein .8s cubic-bezier(.2,.9,.3,1.3) both; }
   /* gelbe Fläche: einmal auffahren, danach leicht pulsieren (wird etwas größer und leuchtet) */
   @keyframes pulsieren {
-    50% { transform: scale(1.025); box-shadow: 0 0 22px color-mix(in srgb, var(--haupt) 45%, transparent); }
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(247,217,0,0); }
+    50% { transform: scale(1.05); box-shadow: 0 0 30px 4px color-mix(in srgb, var(--haupt) 60%, transparent); }
   }
-  .kopf { animation: kopfRein .55s .25s cubic-bezier(.2,.9,.3,1.2) both, pulsieren 2.6s 1.2s ease-in-out infinite; }
+  .kopf { animation: kopfRein .55s .25s cubic-bezier(.2,.9,.3,1.2) both, pulsieren 2.2s 1.2s ease-in-out infinite; }
   .spiel { animation: einGleiten .5s ease-out both; }
   .spiel:nth-child(1) { animation-delay: .45s; }
   .spiel:nth-child(2) { animation-delay: .55s; }
