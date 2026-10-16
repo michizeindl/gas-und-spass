@@ -518,9 +518,21 @@
     return { x: (B - w) / 2, y: H - h, w, h, armaturen: H - h + h * SCHEIBE_UNTEN };
   }
 
+  let dachStreifen = null;
   function cockpit(g, f, ck) {
     if (COCKPIT.complete && COCKPIT.naturalWidth) {
       g.drawImage(COCKPIT, ck.x, ck.y, ck.w, ck.h);
+      // Hohe Handys: über dem Bild fehlt das Dach – die oberste Bildzeile (Dachhimmel) nach oben verlängern
+      if (ck.y > 0) {
+        if (!dachStreifen) {   // oberste Zeile stark verkleinert = weicher Verlauf ohne Streifen
+          dachStreifen = document.createElement('canvas'); dachStreifen.width = 24; dachStreifen.height = 1;
+          dachStreifen.getContext('2d').drawImage(COCKPIT, 0, 2, COCKPIT.naturalWidth, 1, 0, 0, 24, 1);
+        }
+        g.drawImage(dachStreifen, ck.x, 0, ck.w, ck.y + 1);
+        const v = g.createLinearGradient(0, 0, 0, ck.y);
+        v.addColorStop(0, 'rgba(0,0,0,.35)'); v.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = v; g.fillRect(0, 0, B, ck.y + 1);
+      }
     } else {
       // Platzhalter: Armaturenbrett, A-Säulen, Lenkrad
       g.fillStyle = '#16181b';
