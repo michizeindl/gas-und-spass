@@ -26,6 +26,7 @@
   const bremsweg = f => (f.kmh / 10) ** 2 / 2 * (f.wetter === 'regen' ? NASS : 1);
 
   // ---------- Zustand ----------
+  let schilder = [];
   let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, ergebnisse, schreck, wackeln, rehX, ballX, zahlen, blink;
   let B = 0, H = 0;
 
@@ -43,6 +44,14 @@
     tEreignis = 2.6 + Math.random() * 3.4;             // Gefahr kommt nach 2,6 bis 6 Sekunden
     gefahrT = 0; reaktion = null; ziel = null; wackeln = 0; zahlen = null;
     rehX = 4.5; ballX = 3.2;
+    // Schilder am rechten Rand: erst das Tempo, dann die Warnung vor der Gefahr (wie in der Fahrschule)
+    const warnung = { reh: 'wildwechsel', ball: 'kinder', stau: 'stau' }[f.gefahr];
+    // Abstände nach dem frühesten Ort der Gefahr: Warnschild bei 80 %, Tempo-Schild bei 40 % (mindestens 20 m)
+    const fruehesteGefahr = v0 * (2.6 + FAIR) + bremsweg(f) + 1.5;
+    schilder = [{ bild: SCHILD['tempo-' + f.kmh], pos: Math.max(20, fruehesteGefahr * 0.4) }];
+    if (warnung) schilder.push({ bild: SCHILD[warnung], pos: fruehesteGefahr * 0.8 });
+    // Werbeschild vom Autohaus links am Rand (4,5 m breit), weit vorne, damit es auch auf dem Handy lange ganz im Bild ist
+    schilder.push({ bild: WERBUNG, pos: Math.max(70, fruehesteGefahr * 0.7), x: -7.6, hoehe: 3.2 });
     // vorausfahrendes Auto (nur bei „auto“): fährt im Abstand vor einem her
     auto = f.gefahr === 'auto' ? { pos: v0 * FAIR + 2, v: v0, bremst: false, farbe: AUTOFARBEN[nr % AUTOFARBEN.length] } : null;
   }
@@ -177,6 +186,7 @@
     hz = Math.max(60, ck.y + (unten - ck.y) * 0.3);    // Horizont im oberen Drittel der Windschutzscheibe
     PERS = (unten - hz) * NAH;
 
+    rueckstrahler = [];
     himmel(g, f);
     strasse(g, f);
     gefahrZeichnen(g, f);
@@ -291,8 +301,9 @@
       for (let k = 16; k >= 0; k--) {
         const z = k * 25 - lp;
         if (z < NAH) continue;
-        for (const x of [2.6, -6.1]) leitpfosten(g, xZ(x, z), yZ(z), mProM(z), nacht);
+        for (const x of [2.6, -6.1]) leitpfosten(g, xZ(x, z), yZ(z), mProM(z), nacht, x < 0);
       }
+      for (const sch of [...schilder].sort((a, b) => b.pos - a.pos)) schild(g, sch, sch.pos - s);
       return;
     }
     // Fahrbahn: rechter Rand +2,1 m, Mittellinie −1,75 m, linker Rand −5,6 m (Kamera in der Mitte der rechten Spur)
@@ -333,11 +344,34 @@
     for (let k = 16; k >= 0; k--) {
       const z = k * 25 - lp;
       if (z < NAH) continue;
-      for (const x of [2.6, -6.1]) leitpfosten(g, xZ(x, z), yZ(z), mProM(z), nacht);
+      for (const x of [2.6, -6.1]) leitpfosten(g, xZ(x, z), yZ(z), mProM(z), nacht, x < 0);
     }
   }
 
-  function leitpfosten(g, x, y, m, nacht) {
+  // Deutsche Leitpfosten (gemalt): rechts ein länglicher Rückstrahler, links zwei runde.
+  // Lage der Rückstrahler im Bild (Anteil der Höhe von oben), damit sie nachts leuchten können
+  const PFOSTEN = { rechts: bild('leitpfosten-rechts.webp'), links: bild('leitpfosten-links.webp') };
+  const STRAHLER = { rechts: [[0.27, 0.07]], links: [[0.22, 0.035], [0.317, 0.035]] };
+  let rueckstrahler = [];   // nachts gesammelt, nach dem Abdunkeln als Lichtpunkte gezeichnet
+
+  // Verkehrsschilder (gemalt, auf Pfosten): 3 m hoch, Pfosten-Fuß in der Bildmitte, 3,4 m rechts der Kamera
+  const SCHILD = {};
+  for (const n of ['tempo-30', 'tempo-50', 'tempo-70', 'tempo-100', 'wildwechsel', 'kinder', 'stau']) SCHILD[n] = bild('schild-' + n + '.webp');
+  const WERBUNG = bild('werbeschild.webp');   // leere Tafel (ChatGPT) mit Logo und „Ihr Opel-Partner – 2 km“
+  function schild(g, sch, z) {
+    if (z < NAH || z > 300 || !sch.bild || !fertig(sch.bild)) return;
+    const m = mProM(z), h = (sch.hoehe || 3.0) * m, w = h * sch.bild.naturalWidth / sch.bild.naturalHeight;
+    g.drawImage(sch.bild, xZ(sch.x || 3.4, z) - w / 2, yZ(z) - h, w, h);
+  }
+
+  function leitpfosten(g, x, y, m, nacht, links) {
+    const seite = links ? 'links' : 'rechts', bildP = PFOSTEN[seite];
+    if (fertig(bildP)) {
+      const h = 1.0 * m, w = h * bildP.naturalWidth / bildP.naturalHeight;
+      g.drawImage(bildP, x - w / 2, y - h, w, h);
+      if (nacht && h > 6) for (const [yy, r] of STRAHLER[seite]) rueckstrahler.push([x, y - h + h * yy, Math.max(1.2, h * r * 1.6)]);
+      return;
+    }
     const h = 1.0 * m, w = Math.max(1.5, 0.12 * m);
     g.fillStyle = nacht ? '#3a3a3a' : '#f4f4f4';
     g.fillRect(x - w / 2, y - h, w, h);
@@ -447,6 +481,14 @@
       const d = g.createLinearGradient(0, hz, 0, unten);
       d.addColorStop(0, 'rgba(0,0,8,.92)'); d.addColorStop(0.35, 'rgba(0,0,8,.55)'); d.addColorStop(1, 'rgba(0,0,8,.05)');
       g.fillStyle = d; g.fillRect(0, hz - 30, B, unten - hz + 30);
+      // Rückstrahler der Leitpfosten leuchten im Scheinwerferlicht
+      g.save(); g.globalCompositeOperation = 'lighter';
+      for (const [x, y, r] of rueckstrahler) {
+        const v = g.createRadialGradient(x, y, 0, x, y, r * 2.2);
+        v.addColorStop(0, 'rgba(255,240,215,.95)'); v.addColorStop(0.35, 'rgba(255,225,180,.45)'); v.addColorStop(1, 'rgba(255,210,150,0)');
+        g.fillStyle = v; g.fillRect(x - r * 2.2, y - r * 2.2, r * 4.4, r * 4.4);
+      }
+      g.restore();
     } else if (f.wetter === 'regen') {
       g.strokeStyle = 'rgba(220,230,245,.45)'; g.lineWidth = 1;
       const t = performance.now() / 1000;
