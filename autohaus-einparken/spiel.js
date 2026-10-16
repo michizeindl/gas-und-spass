@@ -473,7 +473,7 @@
     wertung: 'hoch',
     format: p => p + ' Punkte',
     texte: {
-      titel: 'Einpark-Profi',
+      titel: 'Einparken',
       untertitel: 'Passt du in jede Lücke?',
       anleitung: 'Zieh mit dem Finger eine Linie vom Auto in die markierte Parklücke – das Auto fährt sie nach. Je gerader und mittiger, desto mehr Punkte. Drei Beulen, dann ist Schluss.',
       ende: 'Einparken auf Knopfdruck? Unsere Neuwagen helfen mit Kamera und Parkassistent.',

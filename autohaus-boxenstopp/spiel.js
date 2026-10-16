@@ -107,7 +107,7 @@
       R_.ende(p, { ueberschrift: p < 25 ? 'Profi-Mechaniker!' : p < 40 ? 'Alle Räder fest!' : 'Geschafft – mit Pausen' });
     }
     const nr = Math.min(rad, RAEDER.length - 1);
-    R_.anzeige(`Runde ${nr + 1}/${RAEDER.length} · ${RAEDER[nr].name}`, sekunden(zeit + strafe));
+    R_.anzeige(`Runde ${nr + 1}/${RAEDER.length} – ${RAEDER[nr].name}`, sekunden(zeit + strafe));
   }
 
   function runter(x, y) {
@@ -411,7 +411,7 @@
     wertung: 'niedrig',
     format: sekunden,
     texte: {
-      titel: 'Boxenstopp',
+      titel: 'Reifenwechsel',
       untertitel: 'Wie schnell wechselst du die Räder?',
       anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sechs Fahrzeuge vom Kleinwagen bis zum Transporter – je größer das Rad, desto kniffliger. Jede falsche Mutter kostet eine Sekunde.',
       ende: 'Reifenwechsel ohne Stress? Das übernimmt unsere Werkstatt für dich.',
