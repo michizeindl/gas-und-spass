@@ -16,7 +16,7 @@ window.KUNDE = {
 
   // Texte überschreiben (alle optional): titel, untertitel, anleitung, ende, endeTitel
   texte: {
-    ende: 'Gute Reflexe brauchen gute Bremsen – jetzt zum Bremsen-Check beim Autohaus Zeindl in Malching.',
+    ende: 'Gute Reflexe brauchen sichere Technik – jetzt zum Bremsen-Check beim Autohaus Zeindl.',
   },
 
   // Startseite mit allen Spielen (Haus-Knopf oben links und Knopf im Start-/Endbild); weglassen, wenn das Spiel allein läuft

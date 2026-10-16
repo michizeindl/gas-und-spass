@@ -45,7 +45,8 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 .karte .bestwert.neu { opacity: 1; color: var(--akzent); font-weight: 700; }
 .karte .text { margin: 0 0 16px; font-size: 15px; line-height: 1.4; }
 /* Endbild: Bewertung („Profi-Mechaniker!“) als schräges Band über der oberen Kante */
-#endSchirm .karte { position: relative; margin-top: 18px; padding-top: 30px; }
+#endSchirm { padding-top: 36px; padding-bottom: 36px; }   /* Platz für das Band, falls die Karte höher als der Bildschirm ist */
+#endSchirm .karte { position: relative; padding-top: 30px; }
 #endSchirm .ueberschrift {
   position: absolute; left: 50%; top: -17px; transform: translateX(-50%) rotate(-3deg);
   max-width: 92%; margin: 0; padding: 6px 18px; border-radius: 6px;

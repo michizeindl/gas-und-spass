@@ -14,7 +14,7 @@ window.KUNDE = {
 
   // Texte überschreiben (alle optional): titel, untertitel, anleitung, ende, endeTitel
   texte: {
-    ende: 'Einparken auf Knopfdruck? Die neuen Opel helfen mit Kamera und Parkassistent – Probefahrt beim Autohaus Zeindl.',
+    ende: 'Einparken auf Knopfdruck? Kamera und Parkassistent helfen – Probefahrt beim Autohaus Zeindl.',
   },
 
   // Startseite mit allen Spielen (Haus-Knopf oben links und Knopf im Start-/Endbild); weglassen, wenn das Spiel allein läuft
