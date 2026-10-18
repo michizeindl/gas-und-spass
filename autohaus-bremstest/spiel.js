@@ -27,13 +27,13 @@
 
   // ---------- Zustand ----------
   let schilder = [];
-  let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, ergebnisse, schreck, wackeln, rehX, ballX, zahlen, blink;
+  let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, ergebnisse, zuFrueh, zuFruehGesamt, wackeln, rehX, ballX, zahlen, blink;
   let B = 0, H = 0;
 
   function neu() {
     // #fahrt=N hinter der Adresse startet bei Fahrt N (zum Testen)
     const t = /fahrt=(\d)/.exec(location.hash);
-    nr = t ? Math.min(FAHRTEN.length, Math.max(1, +t[1])) - 1 : 0; ergebnisse = []; schreck = 0;
+    nr = t ? Math.min(FAHRTEN.length, Math.max(1, +t[1])) - 1 : 0; ergebnisse = []; zuFrueh = 0; zuFruehGesamt = 0;
     fahrtStarten();
   }
   function fahrtStarten() {
@@ -65,8 +65,8 @@
   // ---------- Eingabe ----------
   function runter() {
     if (phase === 'fahren') {
-      // vor der Gefahr getippt
-      schreck++;
+      // vor der Gefahr getippt: gleiche Fahrt nochmal, jedes Mal +0,2 s auf die Reaktionszeit dieser Fahrt
+      zuFrueh++; zuFruehGesamt++;
       phase = 'schreck'; phaseT = 0;
       R_.ton('hupe'); R_.vibrieren(80);
     } else if (phase === 'gefahr') {
@@ -83,11 +83,14 @@
     nr++;
     // Ein Unfall beendet das Spiel sofort (Nutzerwunsch: dann 0 Punkte)
     if (nr >= FAHRTEN.length || ergebnisse.some(e => e.unfall)) { schluss(); return; }
+    zuFrueh = 0;
     fahrtStarten();
   }
 
   // Ø Reaktionszeit → Punkte (höchstens 1.000, wie in allen Spielen), dazwischen gleichmäßig verteilt.
   // Die Stufengrenzen 900/800/700/550 sind in allen Spielen gleich. Ein Unfall beendet das Spiel mit 0 Punkten.
+  const ZU_FRUEH = 0.2;   // Strafzeit in Sekunden je zu frühem Tippen (Nutzerwunsch)
+  const ZU_FRUEH_MAX = 3; // so oft im ganzen Spiel zu früh = Spielende mit 0 Punkten
   const PUNKTE = [[0.4, 1000], [0.5, 900], [0.6, 800], [0.75, 700], [0.9, 550], [1.5, 150]];
   function punkteAus(t) {
     if (t <= PUNKTE[0][0]) return PUNKTE[0][1];
@@ -100,20 +103,20 @@
 
   function schluss() {
     phase = 'aus';
-    const zeiten = ergebnisse.map(e => e.reaktion), schnitt = zeiten.reduce((x, y) => x + y, 0) / zeiten.length;
-    const unfall = ergebnisse.some(e => e.unfall);
-    const t = Math.round(schnitt * 100) / 100;
-    R_.ton(unfall ? 'fehler' : 'sieg');
-    R_.ende(unfall ? 0 : punkteAus(t), {
-      ueberschrift: unfall ? 'Nicht unfallfrei' : t < 0.5 ? 'Blitzschnell' : t < 0.6 ? 'Hellwach' : t < 0.75 ? 'Gute Reflexe' : t < 0.9 ? 'Solide reagiert' : 'Gerade noch geschafft',
-      zusatz: unfall ? '' : 'Ø ' + sek(t),
+    const zeiten = ergebnisse.map(e => e.wertung), schnitt = zeiten.length ? zeiten.reduce((x, y) => x + y, 0) / zeiten.length : 0;
+    const unfall = ergebnisse.some(e => e.unfall), fehlstart = zuFruehGesamt >= ZU_FRUEH_MAX;
+    const t = Math.round(schnitt * 100) / 100, aus = unfall || fehlstart;
+    R_.ton(aus ? 'fehler' : 'sieg');
+    R_.ende(aus ? 0 : punkteAus(t), {
+      ueberschrift: unfall ? 'Nicht unfallfrei' : fehlstart ? 'Zu oft zu früh' : t < 0.5 ? 'Blitzschnell' : t < 0.6 ? 'Hellwach' : t < 0.75 ? 'Gute Reflexe' : t < 0.9 ? 'Solide reagiert' : 'Gerade noch geschafft',
+      zusatz: aus ? '' : 'Ø ' + sek(t),
       auswertung: {   // Reaktionszeit je Fahrt; nach einem Unfall sind die übrigen Fahrten grau
-        kopf: 'Deine Fahrten',
         zeilen: FAHRTEN.map((f, i) => {
           const e = ergebnisse.find(x => x.fahrt === i), name = `${f.kmh} km/h – ${WETTER[f.wetter]}`;
+          if (!e && fehlstart && i === nr) return { name, anteil: 0, wert: 'Aus', schlecht: true };
           if (!e) return { name, anteil: null, wert: '–' };
           if (e.unfall) return { name, anteil: 0, wert: 'Unfall', schlecht: true };
-          return { name, anteil: punkteAus(e.reaktion) / 1000, wert: sek(e.reaktion) };
+          return { name, zusatz: e.zuFrueh ? '+' + String(Math.round(ZU_FRUEH * e.zuFrueh * 10) / 10).replace('.', ',') + ' s' : '', anteil: punkteAus(e.wertung) / 1000, wert: sek(e.wertung) };
         }),
       },
       verzoegerung: 200,
@@ -142,7 +145,8 @@
       else if (phase === 'bremsen' && v === 0 && (!auto || auto.v === 0)) gestoppt(f);
       else if (phase === 'gefahr' && gefahrT > 6) unfall(f);
     } else if (phase === 'schreck' && phaseT > 1.6) {
-      fahrtStarten();   // gleiche Fahrt noch einmal, neue Wartezeit
+      if (zuFruehGesamt >= ZU_FRUEH_MAX) schluss();
+      else fahrtStarten();   // gleiche Fahrt noch einmal, neue Wartezeit
     }
 
     // Motor: dreht mit dem Tempo, beim Stand aus
@@ -185,11 +189,13 @@
     };
     e.anhalteweg = e.reaktionsweg + e.bremsweg;
     e.fahrt = nr;
+    e.zuFrueh = zuFrueh;
+    e.wertung = reaktion + ZU_FRUEH * zuFrueh;   // zählt für Durchschnitt und Punkte
     ergebnisse.push(e);
     return e;
   }
 
-  function schnittZeit() { return ergebnisse.reduce((x, e) => x + e.reaktion, 0) / ergebnisse.length; }
+  function schnittZeit() { return ergebnisse.reduce((x, e) => x + e.wertung, 0) / ergebnisse.length; }
   const sek = p => p.toFixed(2).replace('.', ',') + ' s';
   const meter = m => m.toFixed(1).replace('.', ',') + ' m';
 
@@ -620,7 +626,10 @@
       zeile(`Fahrt ${nr + 1}: ${f.kmh} km/h – ${WETTER[f.wetter]}`, hz * 0.45 + 30, fs, '#fff');
       if (nr === 0) zeile('Tippe, sobald Gefahr droht!', hz * 0.45 + 30 + fs * 1.3, fs * 0.7, F.akzent);
     }
-    if (phase === 'schreck') zeile('Zu früh!', hz * 0.5 + 30, fs * 1.3, '#ffb347');
+    if (phase === 'schreck') {
+      zeile('Zu früh!', hz * 0.5 + 30, fs * 1.3, '#ffb347');
+      zeile(zuFruehGesamt >= ZU_FRUEH_MAX ? zuFruehGesamt + '× zu früh – Schluss!' : '+' + String(ZU_FRUEH).replace('.', ',') + ' s', hz * 0.5 + 30 + fs * 1.5, fs * 0.8, '#ffb347');
+    }
     if (phase === 'auswertung' && zahlen) karte(g, zahlen, fs);
   }
 
@@ -637,7 +646,7 @@
     g.fillStyle = e.unfall ? '#ff6b6b' : '#7bd88f';
     g.fillText(e.unfall ? 'Unfall!' : 'Rechtzeitig!', B / 2, y + fs * 0.95);
     const posten = [
-      ['Reaktionszeit', sek(e.reaktion)],
+      ['Reaktionszeit', e.zuFrueh ? sek(e.reaktion) + ' + ' + sek(ZU_FRUEH * e.zuFrueh) : sek(e.reaktion)],
       ['Reaktionsweg', meter(e.reaktionsweg)],
       ['Bremsweg', meter(e.bremsweg)],
       ['Anhalteweg', meter(e.anhalteweg)],
@@ -664,7 +673,7 @@
     texte: {
       titel: 'Bremsen',
       untertitel: 'Wie sicher reagierst du?',
-      anleitung: 'Probefahrt. Plötzlich taucht eine Gefahr auf. Tippe so schnell wie möglich, um zu bremsen. Aber nicht zu früh! Sechs Fahrten: bei Regen, Nebel und Nacht. Ein Unfall – und aus.',
+      anleitung: 'Probefahrt. Plötzlich taucht eine Gefahr auf. Tippe so schnell wie möglich, um zu bremsen. Zu früh gebremst: +0,2 s, beim dritten Mal ist Schluss. Sechs Fahrten: bei Regen, Nebel und Nacht. Ein Unfall – und aus.',
       ende: 'Gute Reflexe brauchen gute Bremsen.',
     },
     // Aufnahmen (Pixabay Content License)

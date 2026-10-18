@@ -253,7 +253,6 @@
   // Für das Endbild: Punkte je Lücke; nicht gespielte Lücken grau, die Lücke ohne Erfolg (alle Versuche weg) rot mit 0
   function auswertung() {
     return {
-      kopf: 'Deine Lücken',
       zeilen: MAX.map((m, i) => {
         const p = lueckenPunkte[i];
         if (p != null) return { name: 'Lücke ' + (i + 1), anteil: p / m, wert: String(p), max: '/' + m };

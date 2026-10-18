@@ -66,8 +66,9 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 #startSchirm .karte { padding-top: 54px; }
 #startSchirm .karte .logo { margin-bottom: 22px; }
 /* Endbild: Auswertung, eine Zeile je Runde mit Balken */
-.karte .auswertung { margin: 4px 0 16px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.07); text-align: left; }
+.karte .auswertung { margin: 0 0 16px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.07); text-align: left; }
 .karte .auswertung[hidden] { display: none; }
+.auswertung .kopf:empty { display: none; }
 .auswertung .kopf { margin: 0 0 6px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; opacity: .6; text-align: center; }
 .auswertung .zeile { display: grid; grid-template-columns: 1fr 70px auto; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; }
 .auswertung .zeile + .zeile { border-top: 1px solid rgba(255,255,255,.08); }
@@ -167,7 +168,7 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
   .karte h1 { margin-bottom: 8px; }
   .karte .unter { margin-bottom: 22px; }
   .karte .anleitung { margin-bottom: 30px; line-height: 1.5; }
-  .karte .text { margin-bottom: 26px; }
+  .karte .text { margin-bottom: 16px; }
   .karte .bestwert { margin-bottom: 24px; }
   #startSchirm .unter { margin-bottom: 24px; }
   .besttafel { margin-bottom: 24px; }

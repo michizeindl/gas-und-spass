@@ -120,7 +120,6 @@
         ueberschrift: t < 20 ? 'Formel-1-Niveau' : t < 25 ? 'Profi-Mechaniker' : t < 32 ? 'Gute Arbeit' : t < 40 ? 'Passt schon' : 'Endlich fertig',
         zusatz: sekunden(t),
         auswertung: {
-          kopf: 'Deine Räder',
           // Balken im Verhältnis zu einer flotten Zeit für dieses Rad (je Mutter und Tipp 0,45 s), damit große Räder nicht unfair wirken
           zeilen: radZeiten.map(z => {
             const r = RAEDER[z.rad], flott = r.muttern * (r.tipps || 1) * 0.45;
