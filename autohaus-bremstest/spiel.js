@@ -628,9 +628,19 @@
   }
 
   // Sonnenblende vor dem Fahrer, halb heruntergeklappt (oben links in der Windschutzscheibe)
+  // gemalt (ChatGPT, Original Material/Bilder/sonnenblende.webp, Nutzer 18.10.2026): Halterung links oben, Bügel rechts
+  const BLENDE = bild('sonnenblende.webp');
   function sonnenblende(g, ck) {
     const oben = Math.max(0, ck.y + ck.h * 0.02), unten2 = oben + (hz - oben) * 0.62;
     const x0 = B * 0.03, x1 = B * 0.5;
+    if (fertig(BLENDE)) {
+      // so breit wie vorgesehen, aber nie tiefer als drei Viertel bis zum Horizont (Querformat)
+      let w = x1 - x0, h = w * BLENDE.naturalHeight / BLENDE.naturalWidth;
+      const hMax = (hz - oben) * 0.75;
+      if (h > hMax) { h = hMax; w = h * BLENDE.naturalWidth / BLENDE.naturalHeight; }
+      g.drawImage(BLENDE, x0, oben - h * 0.06, w, h);
+      return;
+    }
     const v = g.createLinearGradient(0, oben, 0, unten2);
     v.addColorStop(0, '#2a2b2e'); v.addColorStop(1, '#17181a');
     g.fillStyle = v;
@@ -653,6 +663,8 @@
   // Zeichen in der Lenkradmitte (z. B. das „Z“ aus dem Logo), in kunde.js als lenkradLogo
   // Bildschirm der Mittelkonsole im Cockpit-Bild (Anteile von Breite/Höhe: links, oben, rechts, unten)
   const BILDSCHIRM = bild('bildschirm.webp'), BILDSCHIRM_FLAECHE = [0.6495, 0.5175, 0.8725, 0.6535];
+  // Scheibenwischer: im zugeschnittenen Original (1487 × 150) liegt die Achse bei (50, 99), die Spitze 1435 Bildpunkte rechts davon
+  const WISCHER = bild('scheibenwischer.webp'), WISCHER_ACHSE = [50, 99], WISCHER_LAENGE = 1435;
   const LENKRADLOGO = new Image();
   if (R_.kunde.lenkradLogo) LENKRADLOGO.src = R_.kunde.lenkradLogo;
 
@@ -663,7 +675,42 @@
   }
 
   let dachStreifen = null;
+  // Regentropfen auf der Scheibe (ChatGPT, kachelbar, Original Material/Bilder/regentropfen.webp, Nutzer 18.10.2026):
+  // Beim Wisch nach oben verschwinden sie im überstrichenen Bereich, danach sammeln sie sich bis zum nächsten Wisch wieder.
+  const TROPFEN = bild('regentropfen.webp'), WISCH = { periode: 1.6, dauer: 1.1, achsen: [[0.3, 0.42], [0.62, 0.38]] };
+  let tropfenMuster = null, tropfenLeinwand = null;
+  function wischWinkel(t) { return 0.15 + (t < WISCH.dauer ? Math.sin(t / WISCH.dauer * P) * 1.25 : 0); }
+  function tropfen(g, ck) {
+    if (!fertig(TROPFEN)) return;
+    if (!tropfenLeinwand) tropfenLeinwand = document.createElement('canvas');
+    if (tropfenLeinwand.width !== B || tropfenLeinwand.height !== H) { tropfenLeinwand.width = B; tropfenLeinwand.height = H; tropfenMuster = null; }
+    const k = tropfenLeinwand.getContext('2d');
+    if (!tropfenMuster) tropfenMuster = k.createPattern(TROPFEN, 'repeat');
+    const t = (performance.now() / 1000) % WISCH.periode, oben = WISCH.dauer / 2;
+    // Deckkraft: nach dem Wisch (Wischer oben) frisch, wächst bis zum nächsten Wisch auf 0,85
+    const seit = (t - oben + WISCH.periode) % WISCH.periode;
+    const deck = 0.85 * Math.min(1, seit / (WISCH.periode - oben)) * (t < oben ? 1 : 1);
+    k.clearRect(0, 0, B, H);
+    const m = ck.w * 0.5 / TROPFEN.naturalWidth;
+    tropfenMuster.setTransform(new DOMMatrix().translate(ck.x, ck.y).scale(m));
+    k.globalAlpha = t < oben ? 0.85 : deck; k.fillStyle = tropfenMuster;
+    k.fillRect(0, 0, B, ck.armaturen);
+    // Beim Wisch nach oben: der bereits überstrichene Bereich (Wischblatt = äußere drei Viertel des Arms) ist frei
+    if (t < oben) {
+      k.globalCompositeOperation = 'destination-out'; k.globalAlpha = 1;
+      const w = wischWinkel(t);
+      for (const [px, l] of WISCH.achsen) {
+        const x0 = ck.x + ck.w * px, y0 = ck.armaturen, r = ck.w * l;
+        k.beginPath(); k.arc(x0, y0, r, -w, -0.15); k.arc(x0, y0, r * 0.27, -0.15, -w, true); k.closePath(); k.fill();
+      }
+      k.globalCompositeOperation = 'source-over';
+    }
+    k.globalAlpha = 1;
+    g.drawImage(tropfenLeinwand, 0, 0);
+  }
+
   function cockpit(g, f, ck) {
+    if (f.wetter === 'regen') tropfen(g, ck);
     if (COCKPIT.complete && COCKPIT.naturalWidth) {
       g.drawImage(COCKPIT, ck.x, ck.y, ck.w, ck.h);
       // Hohe Handys: über dem Bild fehlt das Dach – die oberste Bildzeile (Dachhimmel) nach oben verlängern
@@ -709,14 +756,25 @@
       const lw = ck.w * 0.06, lh = lw * LENKRADLOGO.naturalHeight / LENKRADLOGO.naturalWidth;
       g.drawImage(LENKRADLOGO, ck.x + ck.w * LENKRAD[0] - lw / 2, ck.y + ck.h * LENKRAD[1] - lh / 2, lw, lh);
     }
-    // Scheibenwischer bei Regen
+    // Scheibenwischer bei Regen: gemalter Wischer (ChatGPT, Original Material/Bilder/scheibenwischer.webp), dreht um seine Achse.
+    // Ein Wisch hin und zurück in 1,1 s, dann 0,5 s Pause in Ruhestellung (Nutzer, 18.10.2026: realistischer)
     if (f.wetter === 'regen') {
-      const t = (performance.now() / 1300) % 1, w = Math.sin(t * P) * 1.25;
-      g.strokeStyle = '#0d0e10'; g.lineWidth = Math.max(3, ck.w * 0.006); g.lineCap = 'round';
+      const t = (performance.now() / 1000) % WISCH.periode, w = wischWinkel(t) - 0.15;
+      // nur auf der Windschutzscheibe sichtbar: nicht über den Dachhimmel, die Achsen verschwinden unter der Scheibenkante
+      g.save(); g.beginPath(); g.rect(0, Math.max(0, ck.y + ck.h * 0.04), B, ck.armaturen - Math.max(0, ck.y + ck.h * 0.04) + ck.h * 0.01); g.clip();
       for (const [px, l] of [[0.3, 0.42], [0.62, 0.38]]) {
-        const x0 = ck.x + ck.w * px, y0 = ck.armaturen;
-        g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + Math.cos(P + 0.15 + w) * ck.w * l * -1, y0 - Math.sin(0.15 + w) * ck.w * l); g.stroke();
+        const x0 = ck.x + ck.w * px, y0 = ck.armaturen, winkel = 0.15 + w;
+        if (fertig(WISCHER)) {
+          const k = ck.w * l / WISCHER_LAENGE;   // Bildschirmpunkte je Bildpunkt des Originals (die Datei selbst ist verkleinert)
+          g.save(); g.translate(x0, y0); g.rotate(-winkel);
+          g.drawImage(WISCHER, -WISCHER_ACHSE[0] * k, -WISCHER_ACHSE[1] * k, 1487 * k, 150 * k);
+          g.restore();
+        } else {
+          g.strokeStyle = '#0d0e10'; g.lineWidth = Math.max(3, ck.w * 0.006); g.lineCap = 'round';
+          g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + Math.cos(winkel) * ck.w * l, y0 - Math.sin(winkel) * ck.w * l); g.stroke();
+        }
       }
+      g.restore();
     }
     // Digitaler Tacho
     const tx = ck.x + ck.w * TACHO[0], ty = ck.y + ck.h * TACHO[1], fs = Math.max(13, ck.w * 0.028);

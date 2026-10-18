@@ -25,10 +25,10 @@
     { name: 'Großer SUV', muttern: 6, dreh: 1.1, groesse: 0.96, felge: 0.66, farbe: ['#ffffff', '#dde1e6', '#9aa2ac'],
       bild: 'bilder/rad-5.webp', nabe: 0.143, lochkreis: 0.29, mutter: 0.055, merken: 1 },
     { name: 'Transporter', muttern: 6, dreh: 1.3, groesse: 1, felge: 0.62, tipps: 2, wechsel: 2.2, farbe: ['#e4e7eb', '#b5bcc5', '#7d8590'],
-      bild: 'bilder/rad-6.webp', nabe: 0.19, lochkreis: 0.31, mutter: 0.055, versatz: Math.PI / 6, merken: 1, schwingen: [0.06, 2.1] },
+      bild: 'bilder/rad-6.webp', nabe: 0.19, lochkreis: 0.31, mutter: 0.055, versatz: Math.PI / 6, merken: 1, schwingen: [0.06, 2.1], verzinkt: true },
     // Runde 7 (Nutzer, 18.10.2026): Movano – größtes Rad (225/75 R16 auf Stahlfelge), dreht schneller, wechselt öfter die Richtung
     { name: 'Großer Transporter', muttern: 6, dreh: 1.6, groesse: 1.03, felge: 0.56, tipps: 2, wechsel: 1.6, farbe: ['#c9ced4', '#9aa1a9', '#626971'],
-      bild: 'bilder/rad-7.webp', nabe: 0.16, lochkreis: 0.21, mutter: 0.045, versatz: 0,   // LKW-Stahlfelge: Muttern eng um die Nabe, 4 Lüftungslöcher außen (Nutzer, 18.10.2026)
+      bild: 'bilder/rad-7.webp', nabe: 0.16, lochkreis: 0.21, mutter: 0.075, versatz: 0, verzinkt: true,   // LKW-Stahlfelge: Muttern eng um die Nabe, 4 Lüftungslöcher außen (Nutzer, 18.10.2026)
       merken: 1, schwingen: [0.09, 2.6] },
   ];
   // Eigene Fahrzeugnamen aus kunde.js (z. B. Modelle der Marke des Autohauses)
@@ -403,6 +403,31 @@
     g.strokeStyle = '#9aa1ab'; g.lineWidth = 2; g.stroke();
   }
 
+  // Gemalte Radmutter (ChatGPT, Original Material/Bilder/radmutter.webp): Sechskant mit Druckscheibe, Spitze oben.
+  // Die Ecken des Sechskants liegen bei 90 % des halben Bildes. Für festgezogene Muttern eine abgedunkelte Kopie.
+  // Transporter (verzinkt: true, Stahlfelgen): matt silbergraue statt verchromter Mutter (Nutzer, 18.10.2026) – im Code umgefärbt.
+  const MUTTER = new Image(); let mutterDunkel = null, mutterZink = null, mutterZinkDunkel = null;
+  const abdunkeln = quelle => {
+    const c = document.createElement('canvas'); c.width = quelle.width; c.height = quelle.height;
+    const k = c.getContext('2d'); k.drawImage(quelle, 0, 0);
+    k.globalCompositeOperation = 'source-atop'; k.fillStyle = 'rgba(20,24,30,.45)'; k.fillRect(0, 0, c.width, c.height);
+    return c;
+  };
+  MUTTER.onload = () => {
+    mutterDunkel = abdunkeln(MUTTER);
+    // verzinkt: Glanz stark zurücknehmen (Kontrast zur Mitte hin), leicht warmes Grau
+    const c = document.createElement('canvas'); c.width = MUTTER.naturalWidth; c.height = MUTTER.naturalHeight;
+    const k = c.getContext('2d'); k.drawImage(MUTTER, 0, 0);
+    const d = k.getImageData(0, 0, c.width, c.height), q = d.data;
+    for (let i = 0; i < q.length; i += 4) {
+      const l = (q[i] + q[i + 1] + q[i + 2]) / 3, m = 150 + (l - 150) * 0.45;
+      q[i] = m + 4; q[i + 1] = m + 2; q[i + 2] = m - 4;
+    }
+    k.putImageData(d, 0, 0);
+    mutterZink = c; mutterZinkDunkel = abdunkeln(c);
+  };
+  MUTTER.src = 'bilder/radmutter.webp';
+
   function zeichneMuttern(g, r, w, n, zahlen) {
     const noetig = r.tipps || 1;
     g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -417,11 +442,19 @@
       g.fillStyle = 'rgba(0,0,0,.35)';
       sechseck(g, x + 2, y + 3, gr, w + m.anim * 2);
       g.fill();
-      g.fillStyle = m.fest ? '#7d848d' : '#dfe3e8';
-      g.strokeStyle = m.fest ? '#4b5057' : '#5d636b';
-      g.lineWidth = 2;
-      sechseck(g, x, y, gr, w + m.anim * 2);
-      g.fill(); g.stroke();
+      if (mutterDunkel) {   // gemalte Mutter, dreht sich mit dem Rad (Bild hat die Spitze oben, sechseck() eine Ecke bei Winkel 0)
+        const h = gr / 0.9;
+        g.save(); g.translate(x, y); g.rotate(w + m.anim * 2 + Math.PI / 2);
+        const zink = r.verzinkt && mutterZink;
+        g.drawImage(m.fest ? (zink ? mutterZinkDunkel : mutterDunkel) : (zink ? mutterZink : MUTTER), -h, -h, h * 2, h * 2);
+        g.restore();
+      } else {
+        g.fillStyle = m.fest ? '#7d848d' : '#dfe3e8';
+        g.strokeStyle = m.fest ? '#4b5057' : '#5d636b';
+        g.lineWidth = 2;
+        sechseck(g, x, y, gr, w + m.anim * 2);
+        g.fill(); g.stroke();
+      }
       // halb angezogen: Ring zeigt den Fortschritt
       if (!m.fest && m.tipps > 0) {
         g.strokeStyle = F.akzent; g.lineWidth = Math.max(3, MG * 0.23);
@@ -448,6 +481,25 @@
   }
 
   // Fortschritt unten: ein Reifen pro Fahrzeug, von klein nach groß
+  // Rad-Symbol für den Fortschritt (ChatGPT, Original Material/Bilder/rad-symbol.webp, Nutzer 18.10.2026):
+  // die helle Felge wird je nach Stand eingefärbt – offen grau, dran in der Akzentfarbe, geschafft grün
+  const SYMBOL = new Image(), symbolFarbe = {};
+  SYMBOL.src = 'bilder/rad-symbol.webp';
+  function symbol(farbe) {
+    if (symbolFarbe[farbe] || !SYMBOL.complete || !SYMBOL.naturalWidth) return symbolFarbe[farbe] || null;
+    const c = document.createElement('canvas'); c.width = SYMBOL.naturalWidth; c.height = SYMBOL.naturalHeight;
+    const k = c.getContext('2d'); k.drawImage(SYMBOL, 0, 0);
+    const d = k.getImageData(0, 0, c.width, c.height), q = d.data, z = [1, 3, 5].map(i => parseInt(farbe.slice(i, i + 2), 16));
+    for (let i = 0; i < q.length; i += 4) {
+      const l = (q[i] + q[i + 1] + q[i + 2]) / 3;
+      if (l < 90) continue;   // Reifen und Schatten bleiben dunkel
+      const t = Math.min(1, (l - 90) / 50), f = l / 190;
+      for (let n = 0; n < 3; n++) q[i + n] += (Math.min(255, z[n] * f) - q[i + n]) * t;
+    }
+    k.putImageData(d, 0, 0);
+    return (symbolFarbe[farbe] = c);
+  }
+
   function zeichneFortschritt(g, B, H) {
     const y = H - unten / 2 - 2, rGross = Math.min(unten * 0.36, B / (RAEDER.length * 2.6));
     const abst = rGross * 2.5, x0 = B / 2 - abst * (RAEDER.length - 1) / 2;
@@ -456,10 +508,18 @@
       const rr = rGross * (0.55 + 0.45 * r.groesse), x = x0 + i * abst;
       const fertig = i < rad || (i === rad && (phase === 'raus' || phase === 'fertig'));
       const dran = i === rad && !fertig && R_.zustand === 'spiel';
-      g.fillStyle = '#18191b';
-      g.beginPath(); g.arc(x, y, rr, 0, Math.PI * 2); g.fill();
-      g.fillStyle = fertig ? '#43a047' : dran ? R_.mitAlpha(F.akzent, 0.55 + 0.45 * blink) : '#5a5f67';
-      g.beginPath(); g.arc(x, y, rr * r.felge, 0, Math.PI * 2); g.fill();
+      const grau = symbol('#7a8089');
+      if (grau) {
+        g.drawImage(fertig ? symbol('#43a047') : grau, x - rr, y - rr, rr * 2, rr * 2);
+        if (dran && /^#[0-9a-f]{6}$/i.test(F.akzent)) {
+          g.save(); g.globalAlpha = 0.55 + 0.45 * blink; g.drawImage(symbol(F.akzent), x - rr, y - rr, rr * 2, rr * 2); g.restore();
+        }
+      } else {
+        g.fillStyle = '#18191b';
+        g.beginPath(); g.arc(x, y, rr, 0, Math.PI * 2); g.fill();
+        g.fillStyle = fertig ? '#43a047' : dran ? R_.mitAlpha(F.akzent, 0.55 + 0.45 * blink) : '#5a5f67';
+        g.beginPath(); g.arc(x, y, rr * r.felge, 0, Math.PI * 2); g.fill();
+      }
       if (fertig) {
         g.strokeStyle = '#fff'; g.lineWidth = Math.max(2, rr * 0.18);
         g.beginPath(); g.moveTo(x - rr * 0.3, y); g.lineTo(x - rr * 0.07, y + rr * 0.24); g.lineTo(x + rr * 0.33, y - rr * 0.24); g.stroke();
