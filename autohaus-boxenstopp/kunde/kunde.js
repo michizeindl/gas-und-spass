@@ -14,13 +14,13 @@ window.KUNDE = {
 
   // Texte überschreiben (alle optional): titel, untertitel, anleitung, ende, endeTitel
   texte: {
-    anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sechs Fahrzeuge – je größer das Rad, desto kniffliger. Jede falsche Mutter kostet eine Sekunde. Je schneller, desto mehr Punkte.',
+    anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sieben Fahrzeuge – je größer das Rad, desto kniffliger. Ab Runde 5 musst du dir die Reihenfolge merken. Jede falsche Mutter kostet eine Sekunde. Je schneller, desto mehr Punkte.',
     ende: 'Reifenwechsel ohne Stress? Das übernimmt gerne das Autohaus Zeindl in Malching.',
   },
 
-  // Fahrzeuge der sechs Runden, vom kleinsten zum größten Rad
-  // (ohne Eintrag: Kleinwagen, Kompaktwagen, Kompakt-SUV, SUV, Großer SUV, Transporter)
-  fahrzeuge: ['Corsa', 'Astra', 'Mokka', 'Frontera', 'Grandland', 'Vivaro'],
+  // Fahrzeuge der sieben Runden, vom kleinsten zum größten Rad
+  // (ohne Eintrag: Kleinwagen, Kompaktwagen, Kompakt-SUV, SUV, Großer SUV, Transporter, Großer Transporter)
+  fahrzeuge: ['Corsa', 'Astra', 'Mokka', 'Frontera', 'Grandland', 'Vivaro', 'Movano'],
 
   // Startseite mit allen Spielen (Haus-Knopf oben links und Knopf im Start-/Endbild); weglassen, wenn das Spiel allein läuft
   startseite: '../',

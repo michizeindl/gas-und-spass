@@ -1,5 +1,5 @@
-// Boxenstopp: Radmuttern über Kreuz in der richtigen Reihenfolge festziehen – sechs Fahrzeuge vom Kleinwagen
-// bis zum Transporter, so schnell wie möglich. Je größer das Rad, desto schwieriger.
+// Boxenstopp: Radmuttern über Kreuz in der richtigen Reihenfolge festziehen – sieben Fahrzeuge vom Kleinwagen
+// bis zum großen Transporter, so schnell wie möglich. Je größer das Rad, desto schwieriger.
 (function () {
   'use strict';
   const R_ = Rahmen, F = R_.farben;
@@ -10,6 +10,9 @@
   // tipps = Tipper pro Mutter, wechsel = Sekunden bis zum Richtungswechsel, farbe = Felge (hell, mittel, dunkel)
   // Gemalte Räder: bild = Datei, nabe / lochkreis / mutter = Radius der Nabenkappe, Abstand der Muttern
   // zur Mitte und Muttergröße im Verhältnis zum Radradius (am Bild abgemessen). Ohne Bild wird gezeichnet.
+  // merken = ab hier (Runde 5) sieht man die Nummern nur so viele Sekunden zu Beginn des Rads, danach aus dem Kopf;
+  // schwingen = [Ausschlag im Verhältnis zum Radradius, Geschwindigkeit] – das Rad pendelt am Wagenheber (ab Runde 6).
+  // (Nutzer, 18.10.2026)
   const RAEDER = [
     { name: 'Kleinwagen', muttern: 4, dreh: 0, groesse: 0.78, felge: 0.7, farbe: ['#f2f4f7', '#c3c9d1', '#848c96'],
       bild: 'bilder/rad-1.webp', nabe: 0.198, lochkreis: 0.31, mutter: 0.07 },
@@ -20,9 +23,12 @@
     { name: 'SUV', muttern: 5, dreh: -0.8, groesse: 0.91, felge: 0.66, farbe: ['#62666c', '#33363b', '#1c1e21'],
       bild: 'bilder/rad-4.webp', nabe: 0.145, lochkreis: 0.29, mutter: 0.056 },
     { name: 'Großer SUV', muttern: 6, dreh: 1.1, groesse: 0.96, felge: 0.66, farbe: ['#ffffff', '#dde1e6', '#9aa2ac'],
-      bild: 'bilder/rad-5.webp', nabe: 0.143, lochkreis: 0.29, mutter: 0.055 },
+      bild: 'bilder/rad-5.webp', nabe: 0.143, lochkreis: 0.29, mutter: 0.055, merken: 1 },
     { name: 'Transporter', muttern: 6, dreh: 1.3, groesse: 1, felge: 0.62, tipps: 2, wechsel: 2.2, farbe: ['#e4e7eb', '#b5bcc5', '#7d8590'],
-      bild: 'bilder/rad-6.webp', nabe: 0.19, lochkreis: 0.31, mutter: 0.055, versatz: Math.PI / 6 },
+      bild: 'bilder/rad-6.webp', nabe: 0.19, lochkreis: 0.31, mutter: 0.055, versatz: Math.PI / 6, merken: 1, schwingen: [0.06, 2.1] },
+    // Runde 7 (Nutzer, 18.10.2026): Movano – größtes Rad (225/75 R16 auf Stahlfelge), dreht schneller, wechselt öfter die Richtung
+    { name: 'Großer Transporter', muttern: 6, dreh: 1.6, groesse: 1.03, felge: 0.56, tipps: 2, wechsel: 1.6, farbe: ['#c9ced4', '#9aa1a9', '#626971'],
+      bild: 'bilder/rad-7.webp', nabe: 0.155, lochkreis: 0.3, mutter: 0.05, versatz: Math.PI / 6, merken: 1, schwingen: [0.09, 2.6] },
   ];
   // Eigene Fahrzeugnamen aus kunde.js (z. B. Modelle der Marke des Autohauses)
   (R_.kunde.fahrzeuge || []).forEach((n, i) => { if (RAEDER[i] && n) RAEDER[i].name = n; });
@@ -41,10 +47,10 @@
   const BEREIT = 3;     // Countdown 3 – 2 – 1, dann LOS (passend zu klaenge/start.mp3)
   // Zeit → Punkte (höchstens 1.000, wie in allen Spielen), dazwischen gleichmäßig verteilt.
   // Die Stufengrenzen 900/800/700/550 sind in allen Spielen gleich.
-  const ZU_LANGSAM = 120;   // Sekunden (mit Strafzeit): danach Spielende „Zu langsam“ mit 0 Punkten (Nutzerwunsch)
-  const PUNKTE = [[15, 1000], [20, 900], [25, 800], [32, 700], [40, 550], [70, 150], [100, 1]];   // ab 100s nur noch 1 Punkt
+  const ZU_LANGSAM = 160;   // Sekunden (mit Strafzeit): danach Spielende „Zu langsam“ mit 0 Punkten (Nutzerwunsch)
+  const PUNKTE = [[20, 1000], [26, 900], [33, 800], [42, 700], [53, 550], [92, 150], [130, 1]];   // sieben Runden (Nutzer, 18.10.2026); ab 130s nur noch 1 Punkt
 
-  let rad, muttern, naechste, zeit, strafe, radStart, radZeiten, winkel, richtung, richtungT, phase, phaseT, wackeln, schilder, ansage, startTon;
+  let rad, muttern, naechste, zeit, strafe, radStart, radZeiten, winkel, richtung, richtungT, phase, phaseT, wackeln, schilder, ansage, startTon, zeigen, schwingT;
   // Geometrie, wird beim Zeichnen berechnet: R = Rad, FR = Felge, LK = Lochkreis, MG = Muttergröße, NB = Nabenkappe
   let cx = 0, cy = 0, R = 100, FR = 70, LK = 43, MG = 10, NB = 25, unten = 80;
 
@@ -56,7 +62,7 @@
     naechste = 1;
     radStart = { zeit, strafe };   // für die Auswertung: Zeit und Strafe je Fahrzeug
     winkel = Math.random() * Math.PI * 2;
-    richtung = 1; richtungT = 0;
+    richtung = 1; richtungT = 0; zeigen = 0; schwingT = 0;
   }
 
   function neu() {
@@ -90,7 +96,7 @@
   function schild(text, x, y, farbe) { schilder.push({ text, x, y, t: 0, farbe }); }
   function ansagen() {
     const r = RAEDER[rad];
-    ansage = { text: `Runde ${rad + 1}: ${r.name}`, zusatz: r.tipps > 1 ? `Jede Mutter ${r.tipps}× tippen!` : '', t: 0 };
+    ansage = { text: `Runde ${rad + 1}: ${r.name}`, zusatz: r.tipps > 1 ? `Jede Mutter ${r.tipps}× tippen!` : r.merken ? 'Merk dir die Reihenfolge!' : '', t: 0 };
   }
 
   // ---------- Ablauf ----------
@@ -98,6 +104,8 @@
     const r = RAEDER[rad];
     phaseT += dt;
     wackeln = Math.max(0, wackeln - dt);
+    zeigen = Math.max(0, zeigen - dt);
+    if (phase === 'rad') schwingT += dt;
     muttern.forEach(m => { m.anim = Math.max(0, m.anim - dt * 3); });
     schilder.forEach(s => { s.t += dt; });
     schilder = schilder.filter(s => s.t < 0.9);
@@ -124,7 +132,7 @@
       const t = gesamt();
       R_.ton('sieg');
       R_.ende(punkteAus(t), {
-        ueberschrift: t < 20 ? 'Formel-1-Niveau' : t < 25 ? 'Profi-Mechaniker' : t < 32 ? 'Gute Arbeit' : t < 40 ? 'Passt schon' : 'Endlich fertig',
+        ueberschrift: t < 26 ? 'Formel-1-Niveau' : t < 33 ? 'Profi-Mechaniker' : t < 42 ? 'Gute Arbeit' : t < 53 ? 'Passt schon' : 'Endlich fertig',
         zusatz: sekunden(t),
         auswertung: auswertung(false),
       });
@@ -178,6 +186,7 @@
       }
     } else {
       strafe += STRAFE; wackeln = 0.35;
+      if (RAEDER[rad].merken) zeigen = 0.8;   // Nummern kurz wieder einblenden
       R_.ton('fehler'); R_.vibrieren(80);
       schild('+' + STRAFE + 's', mx, my - MG * 1.3, '#ff6b6b');
     }
@@ -195,6 +204,11 @@
     else { LK = FR * 0.62; MG = FR * 0.15; NB = FR * 0.35; }
     cy = oben + platz / 2;
     cx = B / 2;
+    if (r.schwingen && zustand === 'spiel') {
+      const [aus, tempo] = r.schwingen, s = Math.sin(schwingT * tempo);
+      cx += s * R * aus;
+      cy += (1 - Math.cos(schwingT * tempo * 2)) * R * aus * 0.15;
+    }
     if (zustand === 'start') winkel += dt * 0.25;
 
     hintergrund(g, B, H, rMax);
@@ -207,7 +221,7 @@
     const rollen = dx / R; // beim Rollen dreht sich das Rad mit
     g.save();
     g.translate(dx, 0);
-    zeichneRad(g, r, zustand !== 'start', rollen);
+    zeichneRad(g, r, zustand === 'start' ? 0 : zahlenSicht(r), rollen);
     g.restore();
 
     zeichneFortschritt(g, B, H);
@@ -316,6 +330,12 @@
     g.restore();
   }
 
+  // Wie deutlich die Nummern zu sehen sind (0–1): ab Runde 5 nur am Anfang des Rads und kurz nach einem Fehler
+  function zahlenSicht(r) {
+    if (!r.merken || phase !== 'rad') return 1;
+    return Math.max(Math.min(1, (r.merken + 0.3 - phaseT) / 0.3), Math.min(1, zeigen / 0.2));
+  }
+
   function zeichneRad(g, r, zahlen, rollen) {
     const w = winkel + rollen, n = muttern.length;
     // Schatten
@@ -409,8 +429,8 @@
       if (m.fest) {
         g.strokeStyle = '#7bd88f'; g.lineWidth = Math.max(2, MG * 0.23);
         g.beginPath(); g.moveTo(x - gr * 0.45, y); g.lineTo(x - gr * 0.1, y + gr * 0.35); g.lineTo(x + gr * 0.5, y - gr * 0.35); g.stroke();
-      } else if (zahlen) {
-        g.fillStyle = '#1b1f27';
+      } else if (zahlen > 0) {
+        g.fillStyle = R_.mitAlpha('#1b1f27', zahlen);
         g.font = `800 ${Math.round(MG * 1.13)}px ${SCHRIFT}`;
         g.fillText(m.nr, x, y + 1);
       }
@@ -454,7 +474,7 @@
     texte: {
       titel: 'Reifenwechsel',
       untertitel: 'Wie schnell bist du?',
-      anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sechs Fahrzeuge vom Kleinwagen bis zum Transporter – je größer das Rad, desto kniffliger. Jede falsche Mutter kostet eine Sekunde. Je schneller, desto mehr Punkte.',
+      anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sieben Fahrzeuge vom Kleinwagen bis zum großen Transporter – je größer das Rad, desto kniffliger. Ab Runde 5 musst du dir die Reihenfolge merken. Jede falsche Mutter kostet eine Sekunde. Je schneller, desto mehr Punkte.',
       ende: 'Reifenwechsel ohne Stress? Das übernimmt unsere Werkstatt für dich.',
     },
     // Aufnahmen: Pixabay Content License; Werkstatt-Geräusch von Freesound (CC BY 3.0, Namensnennung in quellen)

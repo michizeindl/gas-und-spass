@@ -1,6 +1,6 @@
 // Bremstest: Aus dem Cockpit eine Landstraße entlangfahren. Plötzlich taucht eine Gefahr auf – sofort tippen = Vollbremsung.
 // Danach zeigt das Spiel Reaktionszeit, Reaktionsweg, Bremsweg und Anhalteweg wie in der Fahrschule.
-// Sechs Fahrten, immer schwieriger (Tempo, Regen, Nebel, Nacht). Wertung: durchschnittliche Reaktionszeit.
+// Sieben Fahrten, immer schwieriger (Tempo, Regen, Nebel, Nacht, tief stehende Sonne). Wertung: durchschnittliche Reaktionszeit.
 (function () {
   'use strict';
   const R_ = Rahmen, F = R_.farben;
@@ -8,16 +8,17 @@
   const P = Math.PI;
 
   // ---------- Fahrten ----------
-  // gefahr: reh | ball | auto (bremst vor einem) | stau (Stauende mit Warnblinker)
+  // gefahr: reh | hase | ball | auto (bremst vor einem) | stau (Stauende mit Warnblinker) | ladung (LKW vor einem verliert Holz)
   const FAHRTEN = [
     { kmh: 30, wetter: 'tag', gefahr: 'ball' },
-    { kmh: 50, wetter: 'tag', gefahr: 'reh' },
+    { kmh: 50, wetter: 'tag', gefahr: 'hase' },   // Hase statt Reh (Nutzer, 18.10.2026), das Reh bleibt in Fahrt 5
     { kmh: 50, wetter: 'regen', gefahr: 'auto' },
     { kmh: 70, wetter: 'tag', gefahr: 'stau' },
     { kmh: 70, wetter: 'nebel', gefahr: 'reh' },
     { kmh: 100, wetter: 'nacht', gefahr: 'stau' },
+    { kmh: 100, wetter: 'sonne', gefahr: 'ladung' },   // Fahrt 7 (Nutzer, 18.10.2026): blendende Sonne, Sonnenblende, LKW verliert Ladung
   ];
-  const WETTER = { tag: 'trocken', regen: 'Regen', nebel: 'Nebel', nacht: 'Nacht' };
+  const WETTER = { tag: 'trocken', regen: 'Regen', nebel: 'Nebel', nacht: 'Nacht', sonne: 'Sonne' };
   const NASS = 1.5;          // Bremsweg bei Nässe 1,5-mal so lang
   const FAIR = 0.9;          // bei 0,9 s Reaktionszeit reicht der Platz gerade noch
   const AUTOFARBEN = ['#b9bdc0', '#2f63c6', '#f2f3f1', '#5f6366', '#e2622f', '#1d1f22'];   // Opel-Lackfarben
@@ -27,7 +28,8 @@
 
   // ---------- Zustand ----------
   let schilder = [];
-  let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, ergebnisse, zuFrueh, zuFruehGesamt, wackeln, rehX, ballX, zahlen, blink;
+  let haseX = -6;
+  let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, lkw, holzT, ergebnisse, zuFrueh, zuFruehGesamt, wackeln, rehX, ballX, zahlen, blink;
   let B = 0, H = 0;
 
   function neu() {
@@ -43,9 +45,9 @@
     phase = 'fahren'; phaseT = 0;
     tEreignis = 2.6 + Math.random() * 3.4;             // Gefahr kommt nach 2,6 bis 6 Sekunden
     gefahrT = 0; reaktion = null; ziel = null; wackeln = 0; zahlen = null;
-    rehX = 4.5; ballX = 3.2;
+    rehX = 4.5; ballX = 3.2; haseX = -6;
     // Schilder am rechten Rand: erst das Tempo, dann die Warnung vor der Gefahr (wie in der Fahrschule)
-    const warnung = { reh: 'wildwechsel', ball: 'kinder', stau: 'stau' }[f.gefahr];
+    const warnung = { reh: 'wildwechsel', hase: 'wildwechsel', ball: 'kinder', stau: 'stau' }[f.gefahr];
     // Abstände nach dem frühesten Ort der Gefahr: Warnschild bei 80 %, Tempo-Schild bei 40 % (mindestens 20 m)
     const fruehesteGefahr = v0 * (2.6 + FAIR) + bremsweg(f) + 1.5;
     schilder = [{ bild: SCHILD['tempo-' + f.kmh], pos: Math.max(20, fruehesteGefahr * 0.4) }];
@@ -54,6 +56,9 @@
     schilder.push({ bild: WERBUNG, pos: Math.max(70, fruehesteGefahr * 0.7), x: -7.6, hoehe: 3.2 });
     // vorausfahrendes Auto (nur bei „auto“): fährt im Abstand vor einem her
     auto = f.gefahr === 'auto' ? { pos: v0 * FAIR + 2, v: v0, bremst: false, farbe: AUTOFARBEN[nr % AUTOFARBEN.length] } : null;
+    // LKW mit offener Ladetür (nur bei „ladung“): fährt so weit vorne, dass das herunterfallende Holz fair liegt
+    lkw = f.gefahr === 'ladung' ? { pos: v0 * FAIR + bremsweg(f) + 2.5, v: v0 } : null;
+    holzT = 0;
   }
 
   // Abstand zur Gefahr in Metern (vor der eigenen Stoßstange)
@@ -133,13 +138,16 @@
     if (phase === 'fahren') {
       s += v * dt;
       if (auto) auto.pos += auto.v * dt;
+      if (lkw) lkw.pos += lkw.v * dt;
       if (phaseT >= tEreignis) gefahrBeginnt(f);
     } else if (phase === 'gefahr' || phase === 'bremsen') {
       if (phase === 'gefahr') gefahrT += dt;
       else v = Math.max(0, v - a * dt);
       s += v * dt;
       if (auto) { auto.v = Math.max(0, auto.v - a * dt); auto.pos += auto.v * dt; }
+      if (lkw) { lkw.v += 3 * dt; lkw.pos += lkw.v * dt; holzT += dt; }   // der LKW fährt weiter, das Holz bleibt liegen
       if (f.gefahr === 'reh') rehX = Math.max(0, rehX - dt * 9);
+      if (f.gefahr === 'hase') haseX = Math.min(0, haseX + dt * 10);   // kommt von links
       if (f.gefahr === 'ball') ballX -= dt * 4.5;
       if (abstand() <= 0.3) unfall(f);
       else if (phase === 'bremsen' && v === 0 && (!auto || auto.v === 0)) gestoppt(f);
@@ -163,6 +171,7 @@
     phase = 'gefahr'; gefahrT = 0;
     if (auto) { auto.bremst = true; return; }
     ziel = s + v0 * FAIR + bremsweg(f) + 1.5;
+    if (lkw) ziel = lkw.pos - 1;   // Holz fällt direkt hinter dem LKW auf die Straße
   }
 
   function gestoppt(f) {
@@ -230,7 +239,9 @@
   const fertig = i => i.complete && i.naturalWidth > 0;
   const LANDSCHAFT = bild('landschaft.webp');
   const LANDSCHAFT_HORIZONT = 415;    // Bildzeile der Augenhöhe im Panorama (2000 × 667)
-  const BILD = { reh: bild('reh.webp'), ball: bild('ball.webp'), dreieck: bild('warndreieck.webp'), autoAn: bild('auto-hinten.webp'), autoAus: bild('auto-hinten-aus.webp') };
+  const BILD = { reh: bild('reh.webp'), ball: bild('ball.webp'), dreieck: bild('warndreieck.webp'), autoAn: bild('auto-hinten.webp'), autoAus: bild('auto-hinten-aus.webp'), hase: bild('hase.webp'),
+    stauRot: bild('stau-rot.webp'), stauBlau: bild('stau-blau.webp'),   // Fahrt 6: rotes Fließheck und blaue Limousine (ChatGPT, Original Material/Bilder/stau-autos-rot-blau.webp)
+    lkw: bild('lkw-ladung.webp'), holz: bild('holz.webp') };   // LKW und Holz: ChatGPT (Originale in Material/Bilder)
 
   // Graues Auto in eine Opel-Farbe umlackieren: nur helle, ungesättigte Flächen (Karosserie), Scheiben und Lichter bleiben
   const lackiert = {};
@@ -414,16 +425,43 @@
   // ---------- Gefahren (gemalte Bilder, gezeichneter Ersatz solange sie laden) ----------
   function gefahrZeichnen(g, f) {
     if (auto) return autoHinten(g, -0, auto.pos - s, auto.farbe, auto.bremst, false);
+    if (lkw) {   // erst das Holz (näher), dann der LKW dahinter – von hinten nach vorne zeichnen
+      lkwHinten(g, lkw.pos - s);
+      if (ziel != null && ziel - s > 1) holz(g, ziel - s);
+      return;
+    }
     if (ziel == null) return;
     const z = ziel - s;
     if (z < 1) return;
     if (f.gefahr === 'reh') reh(g, rehX, z);
+    else if (f.gefahr === 'hase') hase(g, haseX, z);
     else if (f.gefahr === 'ball') ball(g, ballX, z);
+    else if (f.gefahr === 'stau' && f.wetter === 'nacht' && fertig(BILD.stauRot) && fertig(BILD.stauBlau)) {
+      // Fahrt 6 (Nutzer, 18.10.2026): eigene Bilder statt der umlackierten Autos
+      stauAuto(g, BILD.stauRot, -3.5, z + 6, 1.9, STAU_LICHT.rot);
+      stauAuto(g, BILD.stauBlau, 0, z, 2.05, STAU_LICHT.blau);
+      warndreieck(g, 1.2, z - 25);
+    }
     else if (f.gefahr === 'stau') {
       autoHinten(g, -3.5, z + 6, AUTOFARBEN[(nr + 2) % 6], true, true);
       autoHinten(g, 0, z, AUTOFARBEN[(nr + 3) % 6], true, true);
       warndreieck(g, 1.2, z - 25);
     }
+  }
+
+  // Lage der Rückleuchten (Anteile von Breite/Höhe, am Bild abgemessen) und der dritten Bremsleuchte oben
+  const STAU_LICHT = { rot: { seiten: [[0.17, 0.38], [0.84, 0.38]], oben: [0.5, 0.16] }, blau: { seiten: [[0.17, 0.42], [0.83, 0.41]], oben: [0.5, 0.11] } };
+  // Stehendes Auto am Stauende als fertiges Bild: Bremslichter an, Warnblinker im Takt (breite in Metern, mit Spiegeln)
+  function stauAuto(g, bildA, x, z, breite, licht) {
+    if (z < 1.5) z = 1.5;
+    const m = mProM(z), w = breite * m, bh = w * bildA.naturalHeight / bildA.naturalWidth, cx = xZ(x, z), y = yZ(z);
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(cx, y - bh * 0.01, w * 0.5, bh * 0.05, 0, 0, P * 2); g.fill();
+    g.drawImage(bildA, cx - w / 2, y - bh, w, bh);
+    g.save(); g.globalCompositeOperation = 'lighter';
+    const glanz = (farbe2, r, punkte) => { for (const [lx, ly] of punkte) { const px = cx - w / 2 + w * lx, py = y - bh + bh * ly; const v = g.createRadialGradient(px, py, 0, px, py, r); v.addColorStop(0, farbe2); v.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = v; g.fillRect(px - r, py - r, r * 2, r * 2); } };
+    glanz('rgba(255,30,10,.9)', w * 0.28, licht.seiten.concat([licht.oben]));
+    if (blink) glanz('rgba(255,160,20,.9)', w * 0.16, licht.seiten);
+    g.restore();
   }
 
   function autoHinten(g, x, z, farbe, bremst, warn) {
@@ -456,6 +494,32 @@
       g.fillStyle = '#ffae1a';
       g.fillRect(cx - w * 0.47, y - h * 0.39, lichtW * 0.6, lichtH * 0.8); g.fillRect(cx + w * 0.35, y - h * 0.39, lichtW * 0.6, lichtH * 0.8);
     }
+  }
+  // LKW von hinten mit offener Ladetür: Kasten 2,2 m breit (im Bild 700 von 968 Bildpunkten, Mitte bei 354), Räder bei 96,5 % der Höhe
+  function lkwHinten(g, z) {
+    if (z < 1.5 || !fertig(BILD.lkw)) return;
+    const m = mProM(z), w = 3.04 * m, h = w * BILD.lkw.naturalHeight / BILD.lkw.naturalWidth;
+    const x = xZ(0, z) - w * (354 / 968), y = yZ(z) - h * 0.965;
+    g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(xZ(0, z), yZ(z), 1.3 * m, 0.12 * m, 0, 0, P * 2); g.fill();
+    g.drawImage(BILD.lkw, x, y, w, h);
+  }
+  // Heruntergefallenes Holz: 3 m breit (quer über die Spur verstreut), fällt in 0,35 s von der Ladekante auf die Straße
+  function holz(g, z) {
+    if (!fertig(BILD.holz)) return;
+    const m = mProM(z), w = 3.0 * m, h = w * BILD.holz.naturalHeight / BILD.holz.naturalWidth;
+    const fall = Math.max(0, 1 - holzT / 0.35) ** 2 * 1.1 * m;
+    g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(xZ(0, z), yZ(z), 1.1 * m, 0.1 * m, 0, 0, P * 2); g.fill();
+    g.drawImage(BILD.holz, xZ(0, z) - w / 2, yZ(z) - h * 0.95 - fall, w, h);
+  }
+  // Feldhase (ChatGPT, aus Material/Bilder/lkw-hase-holz.webp): 0,9 m (im Spiel etwas größer als echt), hoppelt von links
+  // in kurzen, schnellen Sprüngen auf die Fahrbahn (Nutzerwunsch); das Bild schaut schon nach rechts, also nicht spiegeln
+  function hase(g, x, z) {
+    if (!fertig(BILD.hase)) return reh(g, x, z);
+    const m = mProM(z), cx = xZ(x, z), y = yZ(z);
+    const w = 0.9 * m, h = w * BILD.hase.naturalHeight / BILD.hase.naturalWidth;
+    const sprung = Math.abs(Math.sin(x * 3)) * 0.3 * m;
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(cx, y, w * 0.35, w * 0.05, 0, 0, P * 2); g.fill();
+    g.drawImage(BILD.hase, cx - w / 2, y - sprung - h, w, h);
   }
   function reh(g, x, z) {
     const m = mProM(z), cx = xZ(x, z), y = yZ(z);
@@ -519,6 +583,10 @@
         g.fillStyle = v; g.fillRect(x - r * 2.2, y - r * 2.2, r * 4.4, r * 4.4);
       }
       g.restore();
+    } else if (f.wetter === 'sonne') {
+      sonne(g);
+      // das Holz auf der Straße bleibt im Gegenlicht schwach erkennbar (sonst wäre es nicht fair zu sehen)
+      if (lkw && ziel != null && ziel - s > 1) { g.save(); g.globalAlpha = 0.6; holz(g, ziel - s); g.restore(); }
     } else if (f.wetter === 'regen') {
       g.strokeStyle = 'rgba(220,230,245,.45)'; g.lineWidth = 1;
       const t = performance.now() / 1000;
@@ -529,6 +597,52 @@
       }
       g.stroke();
     }
+  }
+
+  // Tief stehende Sonne knapp über dem Horizont, rechts der Mitte (neben der Sonnenblende): grelles Licht,
+  // das alles überstrahlt, dazu Lichtflecken auf der Scheibe. Die Helligkeit flackert, ab und zu blitzt sie heller auf
+  // (wie zwischen Bäumen hindurch). Nutzer, 18.10.2026.
+  function sonne(g) {
+    const t = performance.now() / 1000;
+    const flackern = 0.82 + 0.1 * Math.sin(t * 7.3) + 0.08 * Math.sin(t * 13.1 + 1) + (Math.sin(t * 1.7) > 0.93 ? 0.35 : 0);
+    const sx = B * 0.68, sy = hz - Math.max(22, (unten - hz) * 0.14), r = Math.max(B, H) * 0.7;
+    // ganze Scheibe ausgebleicht
+    g.fillStyle = `rgba(255,244,214,${0.22 * flackern})`;
+    g.fillRect(0, 0, B, unten);
+    g.save(); g.globalCompositeOperation = 'lighter';
+    const v = g.createRadialGradient(sx, sy, 0, sx, sy, r);
+    v.addColorStop(0, `rgba(255,255,250,${Math.min(1, flackern)})`);
+    v.addColorStop(0.04, `rgba(255,250,225,${0.95 * flackern})`);
+    v.addColorStop(0.13, `rgba(255,232,170,${0.6 * flackern})`);
+    v.addColorStop(0.35, `rgba(255,205,125,${0.24 * flackern})`);
+    v.addColorStop(1, 'rgba(255,190,110,0)');
+    g.fillStyle = v; g.fillRect(0, 0, B, H);
+    // Lichtflecken auf der Windschutzscheibe (auf der Linie von der Sonne zur Bildmitte)
+    for (const [k, gr, al] of [[0.45, 0.05, 0.22], [0.8, 0.09, 0.14], [1.25, 0.035, 0.25], [1.6, 0.13, 0.08]]) {
+      const x = sx + (B / 2 - sx) * k * 2, y = sy + (unten * 0.8 - sy) * k, rr = Math.max(B, H) * gr;
+      const f2 = g.createRadialGradient(x, y, 0, x, y, rr);
+      f2.addColorStop(0, `rgba(255,236,190,${al * flackern})`); f2.addColorStop(1, 'rgba(255,236,190,0)');
+      g.fillStyle = f2; g.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+    }
+    g.restore();
+  }
+
+  // Sonnenblende vor dem Fahrer, halb heruntergeklappt (oben links in der Windschutzscheibe)
+  function sonnenblende(g, ck) {
+    const oben = Math.max(0, ck.y + ck.h * 0.02), unten2 = oben + (hz - oben) * 0.62;
+    const x0 = B * 0.03, x1 = B * 0.5;
+    const v = g.createLinearGradient(0, oben, 0, unten2);
+    v.addColorStop(0, '#2a2b2e'); v.addColorStop(1, '#17181a');
+    g.fillStyle = v;
+    g.beginPath();
+    g.moveTo(x0, oben); g.lineTo(x1, oben); g.lineTo(x1 - B * 0.015, unten2 - 6);
+    g.quadraticCurveTo(x1 - B * 0.02, unten2, x1 - B * 0.05, unten2);
+    g.lineTo(x0 + B * 0.04, unten2); g.quadraticCurveTo(x0 + B * 0.01, unten2, x0 + B * 0.005, unten2 - 8);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 2; g.stroke();
+    // Halterung oben
+    g.fillStyle = '#0e0f10';
+    g.fillRect(x0 + B * 0.04, oben - 2, B * 0.05, Math.max(6, (unten2 - oben) * 0.12));
   }
 
   // ---------- Cockpit ----------
@@ -575,6 +689,7 @@
       g.fillStyle = '#0b0c0e';
       g.beginPath(); g.ellipse(ck.x + ck.w * LENKRAD[0], ck.y + ck.h * LENKRAD[1], ck.w * 0.055, ck.h * 0.065, 0, 0, P * 2); g.fill();
     }
+    if (f.wetter === 'sonne') sonnenblende(g, ck);
     // Foto vom Autohaus auf dem Bildschirm in der Mittelkonsole (füllt die Fläche, leicht gedimmt, mit Glas-Spiegelung)
     if (fertig(BILDSCHIRM) && fertig(COCKPIT)) {
       const [x0, y0, x1, y1] = BILDSCHIRM_FLAECHE;
@@ -673,7 +788,7 @@
     texte: {
       titel: 'Bremsen',
       untertitel: 'Wie sicher reagierst du?',
-      anleitung: 'Probefahrt. Plötzlich taucht eine Gefahr auf. Tippe so schnell wie möglich, um zu bremsen. Aber nicht zu früh! Sechs Fahrten: bei Regen, Nebel und Nacht. Ein Unfall – und aus.',
+      anleitung: 'Probefahrt. Plötzlich taucht eine Gefahr auf. Tippe so schnell wie möglich, um zu bremsen. Aber nicht zu früh! Sieben Fahrten: bei Regen, Nebel, Nacht und tief stehender Sonne. Ein Unfall – und aus.',
       ende: 'Gute Reflexe brauchen gute Bremsen.',
     },
     // Aufnahmen (Pixabay Content License)

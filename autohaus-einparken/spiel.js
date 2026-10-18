@@ -1,5 +1,5 @@
 // Einpark-Profi: Mit dem Finger eine Linie vom Auto in die Parklücke ziehen – das Auto fährt sie nach.
-// Sechs Parklücken, drei Beulen erlaubt. Je gerader und mittiger geparkt, desto mehr Punkte.
+// Sieben Parklücken, drei Beulen erlaubt. Je gerader und mittiger geparkt, desto mehr Punkte.
 (function () {
   'use strict';
   const R_ = Rahmen, F = R_.farben;
@@ -29,6 +29,8 @@
   // a = Drehung: 0 = Auto zeigt nach oben, P/2 = nach rechts
   const auto = (x, y, a) => ({ art: 'auto', x, y, w: AB, h: AL, a: a || 0 });
   const wand = (x, y, w, h) => ({ art: 'wand', x, y, w, h, a: 0 });
+  // Autotransporter von oben (Lücke 7): 330 lang, Aufbau 60 breit (am Bild abgemessen: gleiche Autogröße wie im Spiel)
+  const lkw = (x, y, a) => ({ art: 'lkw', x, y, w: 60, h: 328, a: a || 0 });
   const pylon = (x, y) => ({ art: 'pylon', x, y, w: 26, h: 26, a: 0 });
   // Baum in runder Pflanzinsel: d = Bildgröße; anstoßen kann man nur an der Pflanzinsel, die Krone ragt darüber
   const baum = (x, y, bild, d) => ({ art: 'baum', x, y, w: d * 0.7, h: d * 0.7, a: 0, bild, d });
@@ -45,10 +47,15 @@
       hindernisse: [auto(228, 770), auto(372, 770), wand(300, 420, 200, 16), pylon(120, 600), pylon(480, 600), baum(75, 250, 0, 110), baum(535, 840, 1, 80)], logo: [300, 280] },
     { start: { x: 90, y: 800, a: 0 }, ziel: { x: 300, y: 215, w: 64, h: 104, a: 0 },
       hindernisse: [wand(222, 205, 16, 230), wand(378, 205, 16, 230), wand(300, 98, 172, 16),
-        pylon(170, 520), pylon(430, 520), auto(198, 375, P / 2), auto(510, 790, 0.3), auto(500, 650, 0.3)], logo: [300, 650], halle: true },
+        pylon(170, 520), pylon(430, 520), { ...auto(198, 375, P / 2), ohneBucht: true, tueren: true }, { art: 'tuer', x: 206.8, y: 375, w: 87, h: 24, a: P / 2 }, auto(510, 790, 0.3), auto(500, 650, 0.3)], logo: [300, 650], halle: true },
+    // Lücke 7 (Nutzer, 18.10.2026): die schwerste – rückwärts geht nicht, also vorwärts längs einparken in eine enge Lücke
+    // zwischen zwei Autos an der Mauer; davor steht schräg ein Autotransporter, dazu Kegel und ein Baum
+    { start: { x: 530, y: 810, a: 0 }, ziel: { x: 365, y: 112, w: 58, h: 102, a: P / 2 },
+      hindernisse: [wand(300, 62, 600, 14), auto(110, 112, P / 2), auto(235, 112, P / 2),   // Nutzer: rechts der Lücke frei, damit man gerade von rechts einfahren kann
+        lkw(250, 430, P / 2 + 0.1), pylon(480, 620), pylon(560, 330), baum(80, 760, 0, 100)], logo: [300, 760] },
   ];
   // Höchstpunkte je Lücke: schwerere Lücken bringen mehr, zusammen 1.000 (wie in allen Spielen)
-  const MAX = [100, 125, 150, 175, 200, 250];
+  const MAX = [75, 100, 125, 150, 150, 175, 225];   // sieben Lücken (Nutzer, 18.10.2026)
   // Jedes geparkte Auto bekommt eine feste Farbe
   LEVEL.forEach(l => l.hindernisse.forEach((h, i) => { h.farbe = FARBEN[(i * 3 + l.start.x) % FARBEN.length]; }));
   // Gemalte Autos von oben (12 Stück, Opel-Farben) reihum auf die geparkten Autos verteilen; ohne Bild bleibt die Zeichnung
@@ -364,8 +371,8 @@
       g.fillStyle = R_.mitAlpha(F.haupt, 0.18);
       g.fillRect(230, 106, 140, 214);
     }
-    // Parkbuchten der geparkten Autos
-    L.hindernisse.filter(h => h.art === 'auto').forEach(h => bucht(g, { x: h.x, y: h.y, w: 66, h: 104, a: h.a }, R_.mitAlpha(F.haupt, 0.85)));
+    // Parkbuchten der geparkten Autos (ohneBucht: Auto steht frei, z. B. quer vor der Halle in Lücke 6 – Nutzerwunsch)
+    L.hindernisse.filter(h => h.art === 'auto' && !h.ohneBucht).forEach(h => bucht(g, { x: h.x, y: h.y, w: 66, h: 104, a: h.a }, R_.mitAlpha(F.haupt, 0.85)));
     // Ziel-Lücke
     const z = L.ziel, blink = 0.5 + 0.5 * Math.sin(performance.now() / 250);
     g.save();
@@ -439,7 +446,40 @@
     g.restore();
   }
 
+  // Schwarzes Auto mit offenen Türen (Lücke 6, Nutzer 18.10.2026; ChatGPT, Original Material/Bilder/auto-offene-tueren.webp).
+  // Am Bild (1254 × 1254) abgemessen: Karosserie x 369–885, y 29–1231 (Front oben), Türen bis x 61 bzw. 1194, y 360–670.
+  // Die Türen sind ein eigenes unsichtbares Hindernis (art 'tuer') neben dem Auto.
+  const TUEREN = new Image();
+  TUEREN.src = 'bilder/autos/auto-tueren.webp';
+  function autoMitTueren(g, h) {
+    const s = AL / 1202 * 1254 / TUEREN.naturalWidth;   // Bild ist verkleinert: auf die Originalmaße umrechnen
+    g.save();
+    g.translate(h.x, h.y); g.rotate(h.a);
+    g.fillStyle = 'rgba(0,0,0,.35)';
+    g.beginPath(); g.roundRect(-AB / 2 + 4, -AL / 2 + 6, AB, AL, 11); g.fill();
+    const k = TUEREN.naturalWidth / 1254;
+    g.drawImage(TUEREN, -627 * k * s, -AL / 2 - 29 * k * s, TUEREN.naturalWidth * s, TUEREN.naturalHeight * s);
+    g.restore();
+  }
+
+  const TRANSPORTER = new Image();   // ChatGPT, Original Material/Bilder/autotransporter-oben.webp (Führerhaus oben)
+  TRANSPORTER.src = 'bilder/autotransporter.webp';
+  function transporter(g, h) {
+    g.save();
+    g.translate(h.x, h.y); g.rotate(h.a);
+    g.fillStyle = 'rgba(0,0,0,.35)';
+    g.beginPath(); g.roundRect(-h.w / 2 + 5, -h.h / 2 + 7, h.w, h.h, 8); g.fill();
+    if (TRANSPORTER.complete && TRANSPORTER.naturalWidth) {
+      const bw = h.w * 302 / 257;   // Bild mit Spiegeln ist etwas breiter als der Aufbau
+      g.drawImage(TRANSPORTER, -bw / 2, -h.h / 2, bw, h.h);
+    } else { g.fillStyle = '#9aa0a8'; g.fillRect(-h.w / 2, -h.h / 2, h.w, h.h); }
+    g.restore();
+  }
+
   function hindernis(g, h) {
+    if (h.art === 'tuer') return;
+    if (h.art === 'lkw') return transporter(g, h);
+    if (h.tueren && TUEREN.complete && TUEREN.naturalWidth) return autoMitTueren(g, h);
     if (h.art === 'auto') return zeichneAuto(g, h.x, h.y, h.a, h.farbe, false, h.bild);
     g.save();
     g.translate(h.x, h.y); g.rotate(h.a);
