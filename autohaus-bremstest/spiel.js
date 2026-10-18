@@ -240,7 +240,13 @@
   const LANDSCHAFT = bild('landschaft.webp');
   const LANDSCHAFT_HORIZONT = 415;    // Bildzeile der Augenhöhe im Panorama (2000 × 667)
   const BILD = { reh: bild('reh.webp'), ball: bild('ball.webp'), dreieck: bild('warndreieck.webp'), autoAn: bild('auto-hinten.webp'), autoAus: bild('auto-hinten-aus.webp'), hase: bild('hase.webp'),
-    stauRot: bild('stau-rot.webp'), stauBlau: bild('stau-blau.webp'),   // Fahrt 6: rotes Fließheck und blaue Limousine (ChatGPT, Original Material/Bilder/stau-autos-rot-blau.webp)
+    stauRot: bild('stau-rot.webp'), stauBlau: bild('stau-blau.webp'),
+    // Fahrt 4: Transporter, Kombi, SUV, LKW (ChatGPT, Original Material/Bilder/stau-fahrzeuge-4.webp, gleicher Maßstab);
+    // Fahrt 3: Wohnmobil statt Pkw (Original Material/Bilder/wohnmobil-hinten.webp, Rückleuchten aus – Bremslicht macht der Code)
+    stauTransporter: bild('stau-transporter.webp'), stauKombi: bild('stau-kombi.webp'), stauSuv: bild('stau-suv.webp'), stauLkw: bild('stau-lkw.webp'),
+    // Fahrt 6 (Nacht): Reisebus, Pick-up, Kleinwagen, Sattelzug als Nachtbild (Original Material/Bilder/stau-nacht-4.webp)
+    nachtBus: bild('nacht-bus.webp'), nachtPickup: bild('nacht-pickup.webp'), nachtKleinwagen: bild('nacht-kleinwagen.webp'), nachtSattelzug: bild('nacht-sattelzug.webp'),
+    wohnmobil: bild('wohnmobil.webp'), wohnmobilAn: bild('wohnmobil-an.webp'),   // zweites Bild: Bremslichter an (Original Material/Bilder/wohnmobil-hinten-bremslicht.webp)   // Fahrt 6: rotes Fließheck und blaue Limousine (ChatGPT, Original Material/Bilder/stau-autos-rot-blau.webp)
     lkw: bild('lkw-ladung.webp'), holz: bild('holz.webp') };   // LKW und Holz: ChatGPT (Originale in Material/Bilder)
 
   // Graues Auto in eine Opel-Farbe umlackieren: nur helle, ungesättigte Flächen (Karosserie), Scheiben und Lichter bleiben
@@ -424,6 +430,10 @@
 
   // ---------- Gefahren (gemalte Bilder, gezeichneter Ersatz solange sie laden) ----------
   function gefahrZeichnen(g, f) {
+    if (auto && fertig(BILD.wohnmobil)) {
+      const an = auto.bremst && fertig(BILD.wohnmobilAn);
+      return stauAuto(g, an ? BILD.wohnmobilAn : BILD.wohnmobil, 0, Math.max(1.5, auto.pos - s), 2.35, STAU_LICHT.wohnmobil, auto.bremst, false);
+    }
     if (auto) return autoHinten(g, -0, auto.pos - s, auto.farbe, auto.bremst, false);
     if (lkw) {   // erst das Holz (näher), dann der LKW dahinter – von hinten nach vorne zeichnen
       lkwHinten(g, lkw.pos - s);
@@ -436,10 +446,28 @@
     if (f.gefahr === 'reh') reh(g, rehX, z);
     else if (f.gefahr === 'hase') hase(g, haseX, z);
     else if (f.gefahr === 'ball') ball(g, ballX, z);
+    else if (f.gefahr === 'stau' && f.wetter === 'nacht' && ['nachtBus', 'nachtPickup', 'nachtKleinwagen', 'nachtSattelzug'].every(n => fertig(BILD[n]))) {
+      // Fahrt 6 (Nutzer, 19.10.2026): eigenes Stauende bei Nacht – Kleinwagen vorne, dahinter Reisebus; Gegenspur Pick-up und Sattelzug
+      const reihe = [['nachtSattelzug', -3.6, 15], ['nachtBus', 0, 9], ['nachtPickup', -3.5, 4], ['nachtKleinwagen', 0, 0]];
+      for (const [n, x, dz] of reihe) stauAuto(g, BILD[n], x, z + dz, STAU_BREITE[n], STAU_LICHT[n]);
+      warndreieck(g, 1.2, z - 25);
+    }
     else if (f.gefahr === 'stau' && f.wetter === 'nacht' && fertig(BILD.stauRot) && fertig(BILD.stauBlau)) {
       // Fahrt 6 (Nutzer, 18.10.2026): eigene Bilder statt der umlackierten Autos
       stauAuto(g, BILD.stauRot, -3.5, z + 6, 1.9, STAU_LICHT.rot);
       stauAuto(g, BILD.stauBlau, 0, z, 2.05, STAU_LICHT.blau);
+      warndreieck(g, 1.2, z - 25);
+    }
+    else if (f.gefahr === 'stau' && ['stauTransporter', 'stauKombi', 'stauSuv', 'stauLkw', 'stauRot', 'stauBlau'].every(n => fertig(BILD[n]))) {
+      // Fahrt 4 (Nutzer, 18.10.2026): dichter Stau in beiden Spuren, von hinten nach vorne gezeichnet
+      const reihe = [
+        ['stauLkw', 'lkw', 0, 16], ['stauRot', 'rot', -3.5, 19], ['stauBlau', 'blau', -3.5, 11.5], ['stauTransporter', 'transporter', 0, 8],
+        ['stauSuv', 'suv', -3.6, 4.5], ['stauKombi', 'kombi', 0, 0],
+      ];
+      for (const [b, l, x, dz] of reihe.sort((p, q) => q[3] - p[3])) {
+        const breite = STAU_BREITE[l] || (l === 'rot' ? 1.9 : 2.05);
+        stauAuto(g, BILD[b], x, z + dz, breite, STAU_LICHT[l]);
+      }
       warndreieck(g, 1.2, z - 25);
     }
     else if (f.gefahr === 'stau') {
@@ -450,17 +478,24 @@
   }
 
   // Lage der Rückleuchten (Anteile von Breite/Höhe, am Bild abgemessen) und der dritten Bremsleuchte oben
-  const STAU_LICHT = { rot: { seiten: [[0.17, 0.38], [0.84, 0.38]], oben: [0.5, 0.16] }, blau: { seiten: [[0.17, 0.42], [0.83, 0.41]], oben: [0.5, 0.11] } };
+  const STAU_LICHT = { rot: { seiten: [[0.17, 0.38], [0.84, 0.38]], oben: [0.5, 0.16] }, blau: { seiten: [[0.17, 0.42], [0.83, 0.41]], oben: [0.5, 0.11] },
+    transporter: { seiten: [[0.1, 0.554], [0.897, 0.553]], oben: [0.498, 0.021] }, kombi: { seiten: [[0.14, 0.408], [0.875, 0.409]], oben: [0.526, 0.1] },
+    suv: { seiten: [[0.14, 0.378], [0.852, 0.378]], oben: [0.498, 0.099] }, lkw: { seiten: [[0.167, 0.762], [0.834, 0.763]], oben: [0.505, 0.017] },
+    wohnmobil: { seiten: [[0.131, 0.757], [0.863, 0.758]], oben: [0.453, 0.099] },
+    nachtBus: { seiten: [[0.097, 0.67], [0.907, 0.672]], oben: [0.505, 0.111] }, nachtPickup: { seiten: [[0.081, 0.442], [0.916, 0.44]], oben: [0.499, 0.031] },
+    nachtKleinwagen: { seiten: [[0.131, 0.427], [0.875, 0.425]], oben: [0.507, 0.078] }, nachtSattelzug: { seiten: [[0.123, 0.805], [0.883, 0.805]], oben: [0.504, 0.024] } };
+  // Breite mit Spiegeln in Metern (Fahrt-4-Bild: 0,006 m je Bildpunkt, damit die Größen untereinander stimmen)
+  const STAU_BREITE = { transporter: 2.21, kombi: 2.09, suv: 2.14, lkw: 2.36, nachtBus: 2.78, nachtPickup: 2.13, nachtKleinwagen: 1.85, nachtSattelzug: 2.36 };
   // Stehendes Auto am Stauende als fertiges Bild: Bremslichter an, Warnblinker im Takt (breite in Metern, mit Spiegeln)
-  function stauAuto(g, bildA, x, z, breite, licht) {
+  function stauAuto(g, bildA, x, z, breite, licht, bremst = true, warn = true) {
     if (z < 1.5) z = 1.5;
     const m = mProM(z), w = breite * m, bh = w * bildA.naturalHeight / bildA.naturalWidth, cx = xZ(x, z), y = yZ(z);
     g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(cx, y - bh * 0.01, w * 0.5, bh * 0.05, 0, 0, P * 2); g.fill();
     g.drawImage(bildA, cx - w / 2, y - bh, w, bh);
     g.save(); g.globalCompositeOperation = 'lighter';
     const glanz = (farbe2, r, punkte) => { for (const [lx, ly] of punkte) { const px = cx - w / 2 + w * lx, py = y - bh + bh * ly; const v = g.createRadialGradient(px, py, 0, px, py, r); v.addColorStop(0, farbe2); v.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = v; g.fillRect(px - r, py - r, r * 2, r * 2); } };
-    glanz('rgba(255,30,10,.9)', w * 0.28, licht.seiten.concat([licht.oben]));
-    if (blink) glanz('rgba(255,160,20,.9)', w * 0.16, licht.seiten);
+    if (bremst) glanz('rgba(255,30,10,.9)', w * 0.28, licht.seiten.concat([licht.oben]));
+    if (warn && blink) glanz('rgba(255,160,20,.9)', w * 0.16, licht.seiten);
     g.restore();
   }
 
@@ -659,7 +694,7 @@
   const COCKPIT = new Image();
   COCKPIT.src = 'bilder/cockpit.webp';
   // Lage im Cockpit-Bild (Anteile von Breite/Höhe): Unterkante der Windschutzscheibe, Mitte des Tachos
-  const SCHEIBE_UNTEN = 0.46, TACHO = [0.44, 0.6], LENKRAD = [0.426, 0.77];
+  const SCHEIBE_UNTEN = 0.46, TACHO = [0.44, 0.6], LENKRAD = [0.44, 0.768];
   // Zeichen in der Lenkradmitte (z. B. das „Z“ aus dem Logo), in kunde.js als lenkradLogo
   // Bildschirm der Mittelkonsole im Cockpit-Bild (Anteile von Breite/Höhe: links, oben, rechts, unten)
   const BILDSCHIRM = bild('bildschirm.webp'), BILDSCHIRM_FLAECHE = [0.6495, 0.5175, 0.8725, 0.6535];
