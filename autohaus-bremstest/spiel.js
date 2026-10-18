@@ -116,7 +116,7 @@
           if (!e && fehlstart && i === nr) return { name, anteil: 0, wert: 'Aus', schlecht: true };
           if (!e) return { name, anteil: null, wert: '–' };
           if (e.unfall) return { name, anteil: 0, wert: 'Unfall', schlecht: true };
-          return { name, zusatz: e.zuFrueh ? '+' + String(Math.round(ZU_FRUEH * e.zuFrueh * 10) / 10).replace('.', ',') + ' s' : '', anteil: punkteAus(e.wertung) / 1000, wert: sek(e.wertung) };
+          return { name, zusatz: e.zuFrueh ? '+' + String(Math.round(ZU_FRUEH * e.zuFrueh * 10) / 10).replace('.', ',') + 's' : '', anteil: punkteAus(e.wertung) / 1000, wert: sek(e.wertung) };
         }),
       },
       verzoegerung: 200,
@@ -196,7 +196,7 @@
   }
 
   function schnittZeit() { return ergebnisse.reduce((x, e) => x + e.wertung, 0) / ergebnisse.length; }
-  const sek = p => p.toFixed(2).replace('.', ',') + ' s';
+  const sek = p => p.toFixed(2).replace('.', ',') + 's';   // ohne Leerzeichen vor dem s (Nutzerwunsch)
   const meter = m => m.toFixed(1).replace('.', ',') + ' m';
 
   // ---------- Zeichnen ----------
@@ -628,7 +628,7 @@
     }
     if (phase === 'schreck') {
       zeile('Zu früh!', hz * 0.5 + 30, fs * 1.3, '#ffb347');
-      zeile(zuFruehGesamt >= ZU_FRUEH_MAX ? zuFruehGesamt + '× zu früh – Schluss!' : '+' + String(ZU_FRUEH).replace('.', ',') + ' s', hz * 0.5 + 30 + fs * 1.5, fs * 0.8, '#ffb347');
+      zeile(zuFruehGesamt >= ZU_FRUEH_MAX ? zuFruehGesamt + '× zu früh – Schluss!' : '+' + String(ZU_FRUEH).replace('.', ',') + 's', hz * 0.5 + 30 + fs * 1.5, fs * 0.8, '#ffb347');
     }
     if (phase === 'auswertung' && zahlen) karte(g, zahlen, fs);
   }
@@ -673,7 +673,7 @@
     texte: {
       titel: 'Bremsen',
       untertitel: 'Wie sicher reagierst du?',
-      anleitung: 'Probefahrt. Plötzlich taucht eine Gefahr auf. Tippe so schnell wie möglich, um zu bremsen. Zu früh gebremst: +0,2 s, beim dritten Mal ist Schluss. Sechs Fahrten: bei Regen, Nebel und Nacht. Ein Unfall – und aus.',
+      anleitung: 'Probefahrt. Plötzlich taucht eine Gefahr auf. Tippe so schnell wie möglich, um zu bremsen. Aber nicht zu früh! Sechs Fahrten: bei Regen, Nebel und Nacht. Ein Unfall – und aus.',
       ende: 'Gute Reflexe brauchen gute Bremsen.',
     },
     // Aufnahmen (Pixabay Content License)

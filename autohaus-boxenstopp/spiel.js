@@ -76,7 +76,7 @@
     }
     return PUNKTE[PUNKTE.length - 1][1];
   }
-  function sekunden(p) { return p.toFixed(1).replace('.', ',') + ' s'; }
+  function sekunden(p) { return p.toFixed(1).replace('.', ',') + 's'; }   // ohne Leerzeichen vor dem s (Nutzerwunsch)
 
   function mutterPos(m) {
     const n = muttern.length, a = winkel + versatz() + m.i * Math.PI * 2 / n - Math.PI / 2;
@@ -123,7 +123,7 @@
           // Balken im Verhältnis zu einer flotten Zeit für dieses Rad (je Mutter und Tipp 0,45 s), damit große Räder nicht unfair wirken
           zeilen: radZeiten.map(z => {
             const r = RAEDER[z.rad], flott = r.muttern * (r.tipps || 1) * 0.45;
-            return { name: r.name, zusatz: z.strafe ? '+' + Math.round(z.strafe) + ' s' : '', anteil: Math.min(1, flott / z.t), wert: sekunden(z.t) };
+            return { name: r.name, zusatz: z.strafe ? '+' + Math.round(z.strafe) + 's' : '', anteil: Math.min(1, flott / z.t), wert: sekunden(z.t) };
           }),
         },
       });
@@ -162,7 +162,7 @@
     } else {
       strafe += STRAFE; wackeln = 0.35;
       R_.ton('fehler'); R_.vibrieren(80);
-      schild('+' + STRAFE + ' s', mx, my - MG * 1.3, '#ff6b6b');
+      schild('+' + STRAFE + 's', mx, my - MG * 1.3, '#ff6b6b');
     }
   }
 
