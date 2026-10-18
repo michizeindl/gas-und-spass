@@ -56,7 +56,7 @@
   let autoNr = 0;
   LEVEL.forEach(l => l.hindernisse.forEach(h => { if (h.art === 'auto') h.bild = autoNr++ % FREMDE.length; }));
 
-  let lv, wagen, pfad, route, strecke, zeichnet, phase, phaseT, versuch, letzterUnfall, punkte, meldung, wackeln, funken, schonGezogen, lueckenPunkte;
+  let lv, wagen, pfad, route, strecke, zeichnet, phase, phaseT, versuch, letzterUnfall, offen, punkte, meldung, wackeln, funken, schonGezogen, lueckenPunkte;
   let ansicht = new DOMMatrix(), umkehr = new DOMMatrix();
 
   // Pflaster-Bild: enthält genau 5 × 4 Steinmuster; 130 Einheiten breit = ein Stein gut halb so breit wie ein Auto
@@ -89,7 +89,41 @@
     const sprung = /luecke=(\d)/.exec(location.hash);
     lv = sprung ? Math.max(0, Math.min(LEVEL.length - 1, sprung[1] - 1)) : 0;
     versuch = 1; letzterUnfall = false; punkte = 0; schonGezogen = false; lueckenPunkte = [];
+    frageBox.hidden = true; offen = null;
     neuerVersuch();
+  }
+
+  // Unter 90 %: fragen, ob man die Lücke nochmal probieren will (Nutzerwunsch). Der Versuch zählt mit,
+  // die Punkte dieses Versuchs verfallen dann – auch wenn der nächste schlechter wird.
+  const frageStil = document.createElement('style');
+  frageStil.textContent = `
+    .frage { position: fixed; left: 50%; bottom: 7%; transform: translateX(-50%); width: min(320px, calc(100% - 32px));
+      padding: 14px 16px 16px; border: 2px solid var(--haupt); border-radius: 16px; background: rgba(13,13,13,.92);
+      text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.5); animation: einGleiten .3s ease-out both; }
+    .frage[hidden] { display: none; }
+    .frage p { margin: 0 0 4px; font-size: 19px; font-weight: 800; }
+    .frage small { display: block; margin: 0 0 6px; font-size: 13px; opacity: .75; }`;
+  document.head.append(frageStil);
+  const frageBox = document.createElement('div');
+  frageBox.className = 'frage'; frageBox.hidden = true;
+  frageBox.innerHTML = '<p>Nochmal probieren?</p><small></small>' +
+    '<button class="knopf" type="button">Nochmal probieren</button><button class="knopf zweit" type="button">Weiter</button>';
+  document.body.append(frageBox);
+  const [nochmalKnopf, weiterKnopf] = frageBox.querySelectorAll('button');
+  nochmalKnopf.addEventListener('click', () => {
+    if (phase !== 'frage') return;
+    frageBox.hidden = true; offen = null;
+    versuch++; neuerVersuch();
+  });
+  weiterKnopf.addEventListener('click', () => {
+    if (phase !== 'frage') return;
+    frageBox.hidden = true;
+    uebernehmen(offen); offen = null;
+    phaseT = 1.5;   // gleich weiter zur nächsten Lücke
+  });
+  function uebernehmen(p) {
+    punkte += p; lueckenPunkte[lv] = p;
+    phase = 'geparkt'; phaseT = 0;
   }
   function neuerVersuch() {
     wagen = Object.assign({}, LEVEL[lv].start);
@@ -203,6 +237,9 @@
         phase = 'aus';
         R_.ende(punkte, { ueberschrift: letzterUnfall ? 'Zu viele Beulen' : 'Nicht geschafft', auswertung: auswertung(), verzoegerung: 200 });
       } else { versuch++; neuerVersuch(); }
+    } else if (phase === 'frage' && phaseT > 1 && frageBox.hidden && offen != null) {
+      frageBox.querySelector('small').textContent = `Sonst zählen ${offen}/${MAX[lv]} Punkte – Versuch ${versuch + 1}/${VERSUCHE} wäre der nächste.`;
+      frageBox.hidden = false;
     } else if (phase === 'geparkt' && phaseT > 1.5) {
       if (lv === LEVEL.length - 1) {
         phase = 'aus';
@@ -282,8 +319,8 @@
     const luft = Math.max(0, Math.min(1, (X - quer) / (X - AB / 2), (Y - laengs) / (Y - AL / 2)));
     const anteil = ueber > 0 ? 0.5 * (1 - ueber / AB) : 0.5 + 0.5 * luft;
     const p = Math.max(1, Math.round(anteil * MAX[lv]));
-    punkte += p; lueckenPunkte[lv] = p;
-    phase = 'geparkt'; phaseT = 0;
+    if (anteil < 0.9 && versuch < VERSUCHE) { offen = p; phase = 'frage'; phaseT = 0; }
+    else uebernehmen(p);
     const lob = ueber > 0 ? (anteil >= 0.4 ? 'Okay' : anteil >= 0.2 ? 'Gerade noch so' : 'Bitte üben') : anteil >= 0.9 ? 'Perfekt geparkt' : anteil >= 0.7 ? 'Sauber' : 'Geparkt – passt schon';
     meldung = { text: lob + '  ' + p + '/' + MAX[lv], farbe: ueber > 0 ? '#fff' : F.akzent, t: 0 };
     R_.ton('handbremse');                       // Handbremse ziehen, dann Tür zu
