@@ -8,7 +8,7 @@
   const W = 600, HW = 900;   // Spielwelt in Einheiten (hochkant); im Querformat wird sie gedreht
   const AL = 92, AB = 40;    // Länge und Breite eines Autos (Verhältnis wie beim gemalten Auto)
   const TEMPO = 230;         // Einheiten pro Sekunde
-  const VERSUCHE = 6;   // je Lücke; jeder Versuch ohne Punkte (Unfall oder nicht ganz drin) zählt, danach ist Schluss – die bisherigen Punkte bleiben
+  const VERSUCHE = 7;   // je Lücke (Nutzer 18.10.2026: 7 statt 6); jeder Versuch ohne Punkte (Unfall oder nicht ganz drin) zählt, danach ist Schluss – die bisherigen Punkte bleiben
   // Aktuelle Opel-Lackfarben (Corsa, Mokka, Grandland laut carwow.de, Okt. 2026); Farbwerte nachempfunden, nicht offiziell.
   // Kein Gelb: das eigene Auto hat die Kundenfarbe.
   const FARBEN = [
@@ -52,7 +52,7 @@
     // zwischen zwei Autos an der Mauer; davor steht schräg ein Autotransporter, dazu Kegel und ein Baum
     { start: { x: 530, y: 810, a: 0 }, ziel: { x: 365, y: 112, w: 58, h: 102, a: P / 2 },
       hindernisse: [wand(300, 62, 600, 14), auto(110, 112, P / 2), auto(235, 112, P / 2),   // Nutzer: rechts der Lücke frei, damit man gerade von rechts einfahren kann
-        lkw(250, 430, P / 2 + 0.1), pylon(480, 620), pylon(560, 330), baum(80, 760, 0, 100)], logo: [300, 760] },
+        lkw(250, 430, P / 2 + 0.1), pylon(480, 620), pylon(560, 330), baum(80, 760, 0, 100), baum(560, 112, 1, 80)], logo: [300, 760] },   // Baum rechts oben im Eck (Nutzer)
   ];
   // Höchstpunkte je Lücke: schwerere Lücken bringen mehr, zusammen 1.000 (wie in allen Spielen)
   const MAX = [75, 100, 125, 150, 150, 175, 225];   // sieben Lücken (Nutzer, 18.10.2026)
@@ -577,7 +577,7 @@
     texte: {
       titel: 'Einparken',
       untertitel: 'Passt du in jede Lücke?',
-      anleitung: 'Zieh mit dem Finger eine Linie vom Auto in die markierte Parklücke – das Auto fährt sie nach. Je gerader und mittiger, desto mehr Punkte. Pro Lücke sechs Versuche.',
+      anleitung: 'Zieh mit dem Finger eine Linie vom Auto in die markierte Parklücke – das Auto fährt sie nach. Je gerader und mittiger, desto mehr Punkte. Pro Lücke sieben Versuche.',
       ende: 'Einparken auf Knopfdruck? Unsere Neuwagen helfen mit Kamera und Parkassistent.',
     },
     // Aufnahmen (Pixabay Content License); 'crash' ersetzt den erzeugten Ton gleichen Namens
