@@ -38,9 +38,12 @@
   const KREUZ = { 4: [0, 2, 1, 3], 5: [0, 2, 4, 1, 3], 6: [0, 3, 1, 4, 2, 5] };
   const STRAFE = 1;     // Sekunden pro falsch angetippter Mutter
   const WECHSEL = 0.35; // Sekunden für Rad raus bzw. rein
-  const BEREIT = 3;     // Countdown 3 – 2 – 1, dann LOS (passend zu klaenge/start.wav)
+  const BEREIT = 3;     // Countdown 3 – 2 – 1, dann LOS (passend zu klaenge/start.mp3)
+  // Zeit → Punkte (höchstens 1.000, wie in allen Spielen), dazwischen gleichmäßig verteilt.
+  // Die Stufengrenzen 900/800/700/550 sind in allen Spielen gleich.
+  const PUNKTE = [[15, 1000], [20, 900], [25, 800], [32, 700], [40, 550], [70, 150]];
 
-  let rad, muttern, naechste, zeit, strafe, winkel, richtung, richtungT, phase, phaseT, wackeln, schilder, ansage, startTon;
+  let rad, muttern, naechste, zeit, strafe, radStart, radZeiten, winkel, richtung, richtungT, phase, phaseT, wackeln, schilder, ansage, startTon;
   // Geometrie, wird beim Zeichnen berechnet: R = Rad, FR = Felge, LK = Lochkreis, MG = Muttergröße, NB = Nabenkappe
   let cx = 0, cy = 0, R = 100, FR = 70, LK = 43, MG = 10, NB = 25, unten = 80;
 
@@ -50,6 +53,7 @@
     for (let i = 0; i < n; i++) muttern.push({ i, nr: 0, tipps: 0, fest: false, anim: 0 });
     KREUZ[n].forEach((pos, k) => { muttern[(pos + versatz) % n].nr = k + 1; });
     naechste = 1;
+    radStart = { zeit, strafe };   // für die Auswertung: Zeit und Strafe je Fahrzeug
     winkel = Math.random() * Math.PI * 2;
     richtung = 1; richtungT = 0;
   }
@@ -58,12 +62,20 @@
     // #runde=6 hinter der Adresse startet direkt bei Runde 6 (zum Testen)
     const sprung = /runde=(\d)/.exec(location.hash);
     rad = sprung ? Math.max(0, Math.min(RAEDER.length - 1, sprung[1] - 1)) : 0;
-    zeit = 0; strafe = 0; wackeln = 0; schilder = []; ansage = null; startTon = false;
+    zeit = 0; strafe = 0; radZeiten = []; wackeln = 0; schilder = []; ansage = null; startTon = false;
     phase = 'bereit'; phaseT = 0;
     neuesRad();
   }
 
   function gesamt() { return Math.round((zeit + strafe) * 10) / 10; }
+  function punkteAus(t) {
+    if (t <= PUNKTE[0][0]) return PUNKTE[0][1];
+    for (let i = 1; i < PUNKTE.length; i++) {
+      const [t0, p0] = PUNKTE[i - 1], [t1, p1] = PUNKTE[i];
+      if (t <= t1) return Math.round(p0 + (p1 - p0) * (t - t0) / (t1 - t0));
+    }
+    return PUNKTE[PUNKTE.length - 1][1];
+  }
   function sekunden(p) { return p.toFixed(1).replace('.', ',') + ' s'; }
 
   function mutterPos(m) {
@@ -102,9 +114,20 @@
     else if (phase === 'raus' && phaseT > WECHSEL) { rad++; neuesRad(); phase = 'rein'; phaseT = 0; ansagen(); }
     else if (phase === 'rein' && phaseT > WECHSEL) { phase = 'rad'; phaseT = 0; }
     else if (phase === 'fertig' && phaseT > 0.5 && R_.zustand === 'spiel') {
-      const p = gesamt();
+      const t = gesamt();
       R_.ton('sieg');
-      R_.ende(p, { ueberschrift: p < 25 ? 'Profi-Mechaniker!' : p < 40 ? 'Alle Räder fest!' : 'Geschafft – mit Pausen' });
+      R_.ende(punkteAus(t), {
+        ueberschrift: t < 20 ? 'Formel-1-Niveau' : t < 25 ? 'Profi-Mechaniker' : t < 32 ? 'Gute Arbeit' : t < 40 ? 'Passt schon' : 'Endlich fertig',
+        zusatz: sekunden(t),
+        auswertung: {
+          kopf: 'Deine Räder',
+          // Balken im Verhältnis zu einer flotten Zeit für dieses Rad (je Mutter und Tipp 0,45 s), damit große Räder nicht unfair wirken
+          zeilen: radZeiten.map(z => {
+            const r = RAEDER[z.rad], flott = r.muttern * (r.tipps || 1) * 0.45;
+            return { name: r.name, zusatz: z.strafe ? '+' + Math.round(z.strafe) + ' s' : '', anteil: Math.min(1, flott / z.t), wert: sekunden(z.t) };
+          }),
+        },
+      });
     }
     const nr = Math.min(rad, RAEDER.length - 1);
     R_.anzeige(`Runde ${nr + 1}/${RAEDER.length} – ${RAEDER[nr].name}`, sekunden(zeit + strafe));
@@ -118,9 +141,9 @@
       const [mx, my] = mutterPos(m), d = (mx - x) ** 2 + (my - y) ** 2;
       if (d < d2) { d2 = d; beste = m; }
     });
-    if (!beste || beste.fest) return;
+    if (!beste) return;
     const [mx, my] = mutterPos(beste);
-    if (beste.nr === naechste) {
+    if (beste.nr === naechste) {   // schon feste Muttern haben eine kleinere Nummer und zählen unten als Fehler
       beste.tipps++;
       if (beste.tipps < (RAEDER[rad].tipps || 1)) {   // Transporter: erst halb angezogen
         beste.anim = 0.6;
@@ -130,6 +153,7 @@
       beste.fest = true; beste.anim = 1; naechste++;
       R_.ton('schlagschrauber');
       if (naechste > muttern.length) {
+        radZeiten.push({ rad, t: zeit + strafe - radStart.zeit - radStart.strafe, strafe: strafe - radStart.strafe });
         R_.ton('rad-fertig');
         if (rad < RAEDER.length - 1) R_.ton('rad-rollen');
         schild('Rad fertig!', cx, cy - R * 1.05, '#7bd88f');
@@ -138,7 +162,7 @@
       }
     } else {
       strafe += STRAFE; wackeln = 0.35;
-      R_.ton('fehler');
+      R_.ton('fehler'); R_.vibrieren(80);
       schild('+' + STRAFE + ' s', mx, my - MG * 1.3, '#ff6b6b');
     }
   }
@@ -407,13 +431,14 @@
   }
 
   R_.spiel({
-    id: 'autohaus-boxenstopp',
-    wertung: 'niedrig',
-    format: sekunden,
+    id: 'reifenwechsel',   // neuer Name: Bestwerte zählen seit der Umstellung auf 1.000 Punkte neu
+    wertung: 'hoch',
+    format: p => p.toLocaleString('de-DE') + ' Punkte',
+    hoechst: 1000,
     texte: {
       titel: 'Reifenwechsel',
-      untertitel: 'Wie schnell wechselst du die Räder?',
-      anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sechs Fahrzeuge vom Kleinwagen bis zum Transporter – je größer das Rad, desto kniffliger. Jede falsche Mutter kostet eine Sekunde.',
+      untertitel: 'Wie schnell bist du?',
+      anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sechs Fahrzeuge vom Kleinwagen bis zum Transporter – je größer das Rad, desto kniffliger. Jede falsche Mutter kostet eine Sekunde. Je schneller, desto mehr Punkte.',
       ende: 'Reifenwechsel ohne Stress? Das übernimmt unsere Werkstatt für dich.',
     },
     // Aufnahmen: Pixabay Content License; Werkstatt-Geräusch von Freesound (CC BY 3.0, Namensnennung in quellen)
@@ -424,10 +449,10 @@
       fehler: { datei: 'klaenge/fehler.wav', pegel: 0.3 },
       'rad-fertig': { datei: 'klaenge/rad-fertig.wav', pegel: 0.3 },
       'rad-rollen': { datei: 'klaenge/rad-rollen.wav', pegel: 0.35 },
-      start: { datei: 'klaenge/start.wav', pegel: 0.3 },
-      sieg: { datei: 'klaenge/sieg.wav', pegel: 0.45 },
-      bestwert: { datei: 'klaenge/bestwert.wav', pegel: 0.4 },
-      werkstatt: { datei: 'klaenge/werkstatt.wav', pegel: 0.1 },
+      start: { datei: 'klaenge/start.mp3', proben: 77760, pegel: 0.3 },
+      sieg: { datei: 'klaenge/sieg.mp3', proben: 72765, pegel: 0.45 },
+      bestwert: { datei: 'klaenge/bestwert.mp3', proben: 37485, pegel: 0.4 },
+      werkstatt: { datei: 'klaenge/werkstatt.mp3', proben: 522270, pegel: 0.1 },
     },
     schleife: 'werkstatt',
     quellen: 'Werkstatt-Geräusche: „Auto Repair Shop with Pneumatic Drill Sounds“ von ericreinert (freesound.org), Lizenz CC BY 3.0, gekürzt. Weitere Klänge: Pixabay.',

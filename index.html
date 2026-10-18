@@ -72,7 +72,7 @@
     background: rgba(255,255,255,.12); color: #fff; cursor: pointer; display: grid; place-items: center;
   }
   #tonKnopf svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  footer { margin-top: auto; padding-top: 24px; font-size: 12px; opacity: .45; text-align: center; }
+  footer { margin-top: 5px; font-size: 12px; opacity: .45; text-align: center; }
 
   /* ---------- Animationen (dezent) ---------- */
   @keyframes einGleiten { from { opacity: 0; transform: translateY(16px); } }
@@ -115,7 +115,7 @@
 </header>
 
 <nav class="spiele">
-  <a class="spiel" href="autohaus-boxenstopp/" data-id="autohaus-boxenstopp" data-format="sekunden">
+  <a class="spiel" href="autohaus-boxenstopp/" data-id="reifenwechsel">
     <span class="icon" aria-hidden="true">
       <!-- Rad: Reifen mit Profil, Felge mit fünf Speichen, Nabe -->
       <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-linecap="round">
@@ -133,7 +133,7 @@
     </span>
   </a>
 
-  <a class="spiel" href="autohaus-einparken/" data-id="autohaus-einparken" data-format="punkte">
+  <a class="spiel" href="autohaus-einparken/" data-id="einparken">
     <span class="icon" aria-hidden="true">
       <!-- Parkplatz-P -->
       <svg viewBox="0 0 64 64">
@@ -148,7 +148,7 @@
   </a>
 
   <!-- Ein Spiel, das noch in Arbeit ist, bekommt die Klasse „bald“ und kein href: grau, nicht anklickbar, „Demnächst“ -->
-  <a class="spiel" href="autohaus-bremstest/" data-id="autohaus-bremstest" data-format="reaktion">
+  <a class="spiel" href="autohaus-bremstest/" data-id="bremsen">
     <span class="icon" aria-hidden="true">
       <!-- Bremswarnleuchte (!) aus dem Armaturenbrett -->
       <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-linecap="round">
@@ -185,16 +185,17 @@
     document.querySelector('.logo').src = K.logo || 'kunde/logo.svg';
     document.querySelector('.logo').alt = K.firma || '';
     document.querySelector('.titel').textContent = T.titel || 'Spiele';
-    document.querySelector('.unter').textContent = T.untertitel || '';
     document.querySelector('.fuss').textContent = K.firma ? '© ' + K.firma : '';
     document.title = (T.titel || 'Spiele') + (K.firma ? ' – ' + K.firma : '');
+    let gesamt = 0;
     document.querySelectorAll('.spiel').forEach(a => {
       let b = null;
       try { b = localStorage.getItem('mg:best:' + a.dataset.id + ':' + (K.firma || '')); } catch (e) { /* privat */ }
-      if (b == null) return;
-      a.querySelector('.best').textContent = 'Dein Bestwert: ' +
-        (a.dataset.format === 'sekunden' ? (+b).toFixed(1).replace('.', ',') + ' s' : a.dataset.format === 'reaktion' ? (+b).toFixed(2).replace('.', ',') + ' s' : b + ' Punkte');
+      gesamt += +b || 0;   // noch nicht gespielt: 0 Punkte
+      a.querySelector('.best').textContent = 'Dein Bestwert: ' + (+b || 0).toLocaleString('de-DE') + '/1.000 Punkte';   // jedes Spiel höchstens 1.000
     });
+    // Unter „Gas & Spaß“: alle Bestwerte zusammengezählt (Nutzerwunsch statt einer festen Unterzeile)
+    document.querySelector('.unter').textContent = 'Dein Gesamt-Bestwert: ' + gesamt.toLocaleString('de-DE') + ' Punkte';
 
     // Menü-Musik (Pixabay, „Chiptune Level Up“ von desifreemusic, Nr. 610664), auf 20 s gekürzt und
     // läuft einmal beim Öffnen des Menüs und wird am Ende sanft ausgeblendet (Nutzerwunsch: keine Endlosschleife).
@@ -202,7 +203,7 @@
     const SYM_AN = '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>';
     const SYM_AUS = '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
     const PEGEL = 0.35, AUSBLENDEN = 2;   // Lautstärke, Sekunden zum Ausblenden am Ende
-    const musik = new Audio('klaenge/menue.wav');
+    const musik = new Audio('klaenge/menue.mp3');
     musik.volume = PEGEL;
     let tonAn = true, gespielt = false;
     try { tonAn = localStorage.getItem('mg:ton') !== 'aus'; } catch (e) { /* privat */ }

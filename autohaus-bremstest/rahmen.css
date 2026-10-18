@@ -22,7 +22,7 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
   background: rgba(0,0,0,.35); color: #fff; font-size: 17px; cursor: pointer; padding: 0;
   display: grid; place-items: center; flex: none;
 }
-#anzeige button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#anzeige button svg, #anzeige a svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- Start- und Endbild ---------- */
 .schirm {
@@ -41,18 +41,61 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 .karte .unter { margin: 0 0 12px; font-size: 16px; opacity: .85; }
 .karte .anleitung { margin: 0 0 16px; font-size: 14px; line-height: 1.4; opacity: .75; }
 .karte .wert { margin: 6px 0 2px; font-size: clamp(34px, 11vw, 48px); font-weight: 800; color: var(--akzent); font-variant-numeric: tabular-nums; }
+.karte .wert small { font-size: .45em; font-weight: 800; margin-left: 4px; }
+/* gemessene Zeit als Plakette unter den Punkten */
+.karte .zeit {
+  display: inline-flex; align-items: center; gap: 7px; margin: 6px 0 12px; padding: 5px 14px;
+  border: 1.5px solid rgba(255,255,255,.35); border-radius: 999px; font-size: 16px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.karte .zeit[hidden] { display: none; }
+.karte .zeit svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 .karte .bestwert { margin: 0 0 14px; font-size: 14px; opacity: .75; }
 .karte .bestwert.neu { opacity: 1; color: var(--akzent); font-weight: 700; }
 .karte .text { margin: 0 0 16px; font-size: 15px; line-height: 1.4; }
-/* Endbild: Bewertung („Profi-Mechaniker!“) als schräges Band über der oberen Kante */
-#endSchirm { padding-top: 36px; padding-bottom: 36px; }   /* Platz für das Band, falls die Karte höher als der Bildschirm ist */
-#endSchirm .karte { position: relative; padding-top: 30px; }
-#endSchirm .ueberschrift {
+/* Spielname (Startbild) und Bewertung (Endbild, „Profi-Mechaniker!“) als schräges Band über der oberen Kante */
+#startSchirm, #endSchirm { padding-top: 36px; padding-bottom: 36px; }   /* Platz für das Band, falls die Karte höher als der Bildschirm ist */
+#startSchirm .karte, #endSchirm .karte { position: relative; padding-top: 30px; }
+#startSchirm .titel, #endSchirm .ueberschrift {
   position: absolute; left: 50%; top: -17px; transform: translateX(-50%) rotate(-3deg);
   max-width: 92%; margin: 0; padding: 6px 18px; border-radius: 6px;
   background: var(--haupt); color: var(--haupt-text); font-size: 19px; font-weight: 900; line-height: 1.2;
   box-shadow: 0 4px 10px rgba(0,0,0,.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+#startSchirm .titel { top: -19px; font-size: 22px; }
+#startSchirm .karte { padding-top: 54px; }
+#startSchirm .karte .logo { margin-bottom: 22px; }
+/* Endbild: Auswertung, eine Zeile je Runde mit Balken */
+.karte .auswertung { margin: 4px 0 16px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.07); text-align: left; }
+.karte .auswertung[hidden] { display: none; }
+.auswertung .kopf { margin: 0 0 6px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; opacity: .6; text-align: center; }
+.auswertung .zeile { display: grid; grid-template-columns: 1fr 70px auto; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; }
+.auswertung .zeile + .zeile { border-top: 1px solid rgba(255,255,255,.08); }
+.auswertung .name { opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.auswertung .name small { opacity: .7; }
+.auswertung .balken { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+.auswertung .balken i { display: block; height: 100%; border-radius: 3px; background: var(--akzent); }
+.auswertung .zahl { min-width: 64px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+.auswertung .zahl small { font-weight: 600; opacity: .6; }
+.auswertung .zeile.schlecht .balken i { background: #ff6b6b; }
+.auswertung .zeile.schlecht .zahl { color: #ff6b6b; }
+.auswertung .zeile.offen { opacity: .4; }
+
+/* Startbild: Frage als Sprechblase, Bestwert als Tafel */
+#startSchirm .unter {
+  position: relative; display: inline-block; margin: 0 0 20px; padding: 10px clamp(12px, 4.5vw, 18px);
+  background: #fff; color: #111; border-radius: 14px; font-size: clamp(15px, 4.8vw, 18px);   /* auf schmalen Handys kleiner, damit einzeilig */ font-weight: 800; line-height: 1.25; opacity: 1;
+}
+#startSchirm .unter:empty { display: none; }
+#startSchirm .unter::after {
+  content: ""; position: absolute; left: 50%; bottom: -9px; margin-left: -9px;
+  border: 9px solid transparent; border-bottom: 0; border-top-color: #fff;
+}
+.besttafel { margin: 0 0 14px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.07); }
+.besttafel[hidden] { display: none; }
+.besttafel .name { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; opacity: .6; }
+.besttafel .zahl { margin-top: 2px; font-size: 30px; font-weight: 800; line-height: 1.1; color: var(--akzent); font-variant-numeric: tabular-nums; }
+.besttafel .zahl small { font-size: .5em; color: var(--hell); opacity: .7; margin-left: 2px; }
 .karte .quellen { margin: 12px 0 0; font-size: 11px; line-height: 1.35; opacity: .5; }
 .karte .quellen:empty { display: none; }
 .knopf {
@@ -77,8 +120,13 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
   70% { opacity: 1; transform: translateX(-50%) rotate(-1deg) scale(.95); }
   100% { transform: translateX(-50%) rotate(-3deg); }
 }
+/* danach pulsiert das Band dauerhaft: wird etwas größer, wippt leicht und leuchtet (wie die gelbe Fläche im Menü) */
+@keyframes bandPuls {
+  0%, 100% { transform: translateX(-50%) rotate(-3deg) scale(1); box-shadow: 0 4px 10px rgba(0,0,0,.45); }
+  50% { transform: translateX(-50%) rotate(-1deg) scale(1.08); box-shadow: 0 4px 10px rgba(0,0,0,.45), 0 0 24px 3px color-mix(in srgb, var(--haupt) 55%, transparent); }
+}
 .schirm:not([hidden]) .karte { animation: einGleiten .35s ease-out both; }
-.schirm:not([hidden]) .karte > :not(.logo):not(.ueberschrift) { animation: einGleiten .45s ease-out both; }
+.schirm:not([hidden]) .karte > :not(.logo):not(.ueberschrift):not(.titel) { animation: einGleiten .45s ease-out both; }
 .schirm:not([hidden]) .karte > :nth-child(2) { animation-delay: .12s; }
 .schirm:not([hidden]) .karte > :nth-child(3) { animation-delay: .19s; }
 .schirm:not([hidden]) .karte > :nth-child(4) { animation-delay: .26s; }
@@ -87,7 +135,9 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 .schirm:not([hidden]) .karte > :nth-child(7) { animation-delay: .47s; }
 .schirm:not([hidden]) .karte > :nth-child(n+8) { animation-delay: .54s; }
 .schirm:not([hidden]) .karte .logo { animation: logoRein .7s cubic-bezier(.2,.9,.3,1.3) both; }
-#endSchirm:not([hidden]) .ueberschrift { animation: bandRein .6s .25s cubic-bezier(.2,.9,.3,1.2) both; }
+#startSchirm:not([hidden]) .titel, #endSchirm:not([hidden]) .ueberschrift {
+  animation: bandRein .6s .25s cubic-bezier(.2,.9,.3,1.2) both, bandPuls 2.2s 1s ease-in-out infinite;
+}
 
 /* Knöpfe: heben sich beim Überfahren, geben beim Drücken nach; der Hauptknopf „atmet“ und glänzt */
 .knopf { position: relative; overflow: hidden; transition: transform .15s, box-shadow .15s, background-color .15s; }
@@ -113,11 +163,14 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 @media (min-height: 680px) {
   .karte { padding: 34px 24px 30px; }
   .karte .logo { margin-bottom: 26px; }
+  #startSchirm .karte .logo { margin-bottom: 34px; }
   .karte h1 { margin-bottom: 8px; }
   .karte .unter { margin-bottom: 22px; }
   .karte .anleitung { margin-bottom: 30px; line-height: 1.5; }
   .karte .text { margin-bottom: 26px; }
   .karte .bestwert { margin-bottom: 24px; }
+  #startSchirm .unter { margin-bottom: 24px; }
+  .besttafel { margin-bottom: 24px; }
   .knopf { margin-top: 14px; padding: 15px 16px; }
 }
 
@@ -125,8 +178,15 @@ canvas#feld { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 @media (max-height: 520px) {
   .karte { padding: 14px 18px; }
   .karte .logo { max-height: 44px; margin-bottom: 8px; }
-  .karte .unter { margin-bottom: 6px; }
+  #startSchirm .karte { padding-top: 34px; }
+  #startSchirm .karte .logo { margin-bottom: 10px; }
+  .karte .unter, #startSchirm .unter { margin-bottom: 8px; }
+  #startSchirm .unter { padding: 6px 14px; font-size: 15px; }
+  .besttafel { margin-bottom: 8px; padding: 6px 10px; }
+  .besttafel .zahl { font-size: 22px; }
   .karte .anleitung { margin-bottom: 10px; }
   .karte .wert { font-size: 32px; }
   .knopf { padding: 9px 14px; font-size: 15px; }
+  .karte .auswertung { margin-bottom: 8px; padding: 6px 10px; }
+  .auswertung .zeile { padding: 1px 0; font-size: 12px; }
 }

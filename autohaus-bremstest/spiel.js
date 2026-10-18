@@ -68,7 +68,7 @@
       // vor der Gefahr getippt
       schreck++;
       phase = 'schreck'; phaseT = 0;
-      R_.ton('hupe');
+      R_.ton('hupe'); R_.vibrieren(80);
     } else if (phase === 'gefahr') {
       reaktion = gefahrT;
       phase = 'bremsen'; phaseT = 0;
@@ -81,18 +81,41 @@
 
   function weiter() {
     nr++;
-    if (nr >= FAHRTEN.length) { schluss(); return; }
+    // Ein Unfall beendet das Spiel sofort (Nutzerwunsch: dann 0 Punkte)
+    if (nr >= FAHRTEN.length || ergebnisse.some(e => e.unfall)) { schluss(); return; }
     fahrtStarten();
+  }
+
+  // Ø Reaktionszeit → Punkte (höchstens 1.000, wie in allen Spielen), dazwischen gleichmäßig verteilt.
+  // Die Stufengrenzen 900/800/700/550 sind in allen Spielen gleich. Ein Unfall beendet das Spiel mit 0 Punkten.
+  const PUNKTE = [[0.4, 1000], [0.5, 900], [0.6, 800], [0.75, 700], [0.9, 550], [1.5, 150]];
+  function punkteAus(t) {
+    if (t <= PUNKTE[0][0]) return PUNKTE[0][1];
+    for (let i = 1; i < PUNKTE.length; i++) {
+      const [t0, p0] = PUNKTE[i - 1], [t1, p1] = PUNKTE[i];
+      if (t <= t1) return Math.round(p0 + (p1 - p0) * (t - t0) / (t1 - t0));
+    }
+    return PUNKTE[PUNKTE.length - 1][1];
   }
 
   function schluss() {
     phase = 'aus';
     const zeiten = ergebnisse.map(e => e.reaktion), schnitt = zeiten.reduce((x, y) => x + y, 0) / zeiten.length;
-    const unfaelle = ergebnisse.filter(e => e.unfall).length;
-    const p = Math.round(schnitt * 100) / 100;
-    R_.ton(unfaelle ? 'fehler' : 'sieg');
-    R_.ende(p, {
-      ueberschrift: unfaelle ? (unfaelle === 1 ? '1 Zusammenstoß' : unfaelle + ' Zusammenstöße') : p < 0.6 ? 'Blitzschnell!' : p < 0.9 ? 'Gute Reflexe!' : 'Gerade noch rechtzeitig',
+    const unfall = ergebnisse.some(e => e.unfall);
+    const t = Math.round(schnitt * 100) / 100;
+    R_.ton(unfall ? 'fehler' : 'sieg');
+    R_.ende(unfall ? 0 : punkteAus(t), {
+      ueberschrift: unfall ? 'Nicht unfallfrei' : t < 0.5 ? 'Blitzschnell' : t < 0.6 ? 'Hellwach' : t < 0.75 ? 'Gute Reflexe' : t < 0.9 ? 'Solide reagiert' : 'Gerade noch geschafft',
+      zusatz: unfall ? '' : 'Ø ' + sek(t),
+      auswertung: {   // Reaktionszeit je Fahrt; nach einem Unfall sind die übrigen Fahrten grau
+        kopf: 'Deine Fahrten',
+        zeilen: FAHRTEN.map((f, i) => {
+          const e = ergebnisse.find(x => x.fahrt === i), name = `${f.kmh} km/h – ${WETTER[f.wetter]}`;
+          if (!e) return { name, anteil: null, wert: '–' };
+          if (e.unfall) return { name, anteil: 0, wert: 'Unfall', schlecht: true };
+          return { name, anteil: punkteAus(e.reaktion) / 1000, wert: sek(e.reaktion) };
+        }),
+      },
       verzoegerung: 200,
     });
   }
@@ -151,7 +174,7 @@
     wackeln = 0.5;
     zahlen = auswerten(f, true, 0);
     phase = 'auswertung'; phaseT = 0;
-    R_.ton('crash');
+    R_.ton('crash'); R_.vibrieren([200, 80, 200]);
   }
 
   function auswerten(f, unfallJa, platz) {
@@ -161,6 +184,7 @@
       bremsweg: bremsweg(f),
     };
     e.anhalteweg = e.reaktionsweg + e.bremsweg;
+    e.fahrt = nr;
     ergebnisse.push(e);
     return e;
   }
@@ -611,7 +635,7 @@
     g.textAlign = 'center';
     g.font = `900 ${fs}px ${SCHRIFT}`;
     g.fillStyle = e.unfall ? '#ff6b6b' : '#7bd88f';
-    g.fillText(e.unfall ? 'Zusammenstoß!' : 'Rechtzeitig!', B / 2, y + fs * 0.95);
+    g.fillText(e.unfall ? 'Unfall!' : 'Rechtzeitig!', B / 2, y + fs * 0.95);
     const posten = [
       ['Reaktionszeit', sek(e.reaktion)],
       ['Reaktionsweg', meter(e.reaktionsweg)],
@@ -627,35 +651,36 @@
     });
     g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.65)';
     g.font = `600 ${fs * 0.55}px ${SCHRIFT}`;
-    g.fillText(nr < FAHRTEN.length - 1 ? 'Tippen für die nächste Fahrt' : 'Tippen für das Ergebnis', B / 2, y + h - fs * 0.7);
+    g.fillText(nr < FAHRTEN.length - 1 && !e.unfall ? 'Tippen für die nächste Fahrt' : 'Tippen für das Ergebnis', B / 2, y + h - fs * 0.7);
   }
 
   const motor = R_.dauerton('motor'), regen = R_.dauerton('regen'), nacht = R_.dauerton('nacht'), blinker = R_.dauerton('blinker');
 
   R_.spiel({
-    id: 'autohaus-bremstest',
-    wertung: 'niedrig',
-    format: sek,
+    id: 'bremsen',   // neuer Name: Bestwerte zählen seit der Umstellung auf 1.000 Punkte neu
+    wertung: 'hoch',
+    format: p => p.toLocaleString('de-DE') + ' Punkte',
+    hoechst: 1000,
     texte: {
       titel: 'Bremsen',
-      untertitel: 'Wie schnell stehst du?',
-      anleitung: 'Probefahrt. Plötzlich taucht eine Gefahr auf. Tippe so schnell wie möglich, um zu bremsen. Aber nicht zu früh! Sechs Fahrten: bei Regen, Nebel und Nacht.',
+      untertitel: 'Wie sicher reagierst du?',
+      anleitung: 'Probefahrt. Plötzlich taucht eine Gefahr auf. Tippe so schnell wie möglich, um zu bremsen. Aber nicht zu früh! Sechs Fahrten: bei Regen, Nebel und Nacht. Ein Unfall – und aus.',
       ende: 'Gute Reflexe brauchen gute Bremsen.',
     },
     // Aufnahmen (Pixabay Content License)
     klaenge: {
       klick: { datei: 'klaenge/klick.wav', pegel: 0.35 },
-      crash: { datei: 'klaenge/crash.wav', pegel: 0.55 },
-      motor: { datei: 'klaenge/motor-fahrt.wav', pegel: 0.3 },
+      crash: { datei: 'klaenge/crash.mp3', proben: 58433, pegel: 0.55 },
+      motor: { datei: 'klaenge/motor-fahrt.mp3', proben: 242550, pegel: 0.3 },
       bremsen: { datei: 'klaenge/bremsen.wav', pegel: 0.5 },
       hupe: { datei: 'klaenge/hupe.wav', pegel: 0.35 },
       gut: { datei: 'klaenge/gut.wav', pegel: 0.4 },
-      regen: { datei: 'klaenge/regen.wav', pegel: 0.35 },
-      nacht: { datei: 'klaenge/nacht.wav', pegel: 0.3 },
-      blinker: { datei: 'klaenge/blinker.wav', pegel: 0.3 },
-      musik: { datei: 'klaenge/musik.wav', pegel: 0.07 },   // leise Hintergrundmusik (Pixabay, Red Skies – Late Night Ride)
-      sieg: { datei: 'klaenge/sieg.wav', pegel: 0.45 },
-      bestwert: { datei: 'klaenge/bestwert.wav', pegel: 0.4 },
+      regen: { datei: 'klaenge/regen.mp3', proben: 242550, pegel: 0.35 },
+      nacht: { datei: 'klaenge/nacht.mp3', proben: 242550, pegel: 0.3 },
+      blinker: { datei: 'klaenge/blinker.mp3', proben: 43473, pegel: 0.3 },
+      musik: { datei: 'klaenge/musik.mp3', proben: 606375, pegel: 0.07 },   // leise Hintergrundmusik (Pixabay, Red Skies – Late Night Ride)
+      sieg: { datei: 'klaenge/sieg.mp3', proben: 71663, pegel: 0.45 },
+      bestwert: { datei: 'klaenge/bestwert.mp3', proben: 37485, pegel: 0.4 },
     },
     schleife: 'musik',
     neu, schritt, zeichne, runter, groesse(b, h) { B = b; H = h; },

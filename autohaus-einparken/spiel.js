@@ -8,7 +8,7 @@
   const W = 600, HW = 900;   // Spielwelt in Einheiten (hochkant); im Querformat wird sie gedreht
   const AL = 92, AB = 40;    // Länge und Breite eines Autos (Verhältnis wie beim gemalten Auto)
   const TEMPO = 230;         // Einheiten pro Sekunde
-  const LEBEN = 3;
+  const VERSUCHE = 3;   // je Lücke; jeder Versuch ohne Punkte (Unfall oder nicht ganz drin) zählt, nach dem dritten ist Schluss mit 0 Punkten
   // Aktuelle Opel-Lackfarben (Corsa, Mokka, Grandland laut carwow.de, Okt. 2026); Farbwerte nachempfunden, nicht offiziell.
   // Kein Gelb: das eigene Auto hat die Kundenfarbe.
   const FARBEN = [
@@ -45,8 +45,10 @@
       hindernisse: [auto(228, 770), auto(372, 770), wand(300, 420, 200, 16), pylon(120, 600), pylon(480, 600), baum(75, 250, 0, 110), baum(535, 840, 1, 80)], logo: [300, 280] },
     { start: { x: 90, y: 800, a: 0 }, ziel: { x: 300, y: 215, w: 64, h: 104, a: 0 },
       hindernisse: [wand(222, 205, 16, 230), wand(378, 205, 16, 230), wand(300, 98, 172, 16),
-        pylon(170, 520), pylon(430, 520), auto(510, 790, 0.3), auto(500, 650, 0.3)], logo: [300, 650], halle: true },
+        pylon(170, 520), pylon(430, 520), auto(198, 375, P / 2), auto(510, 790, 0.3), auto(500, 650, 0.3)], logo: [300, 650], halle: true },
   ];
+  // Höchstpunkte je Lücke: schwerere Lücken bringen mehr, zusammen 1.000 (wie in allen Spielen)
+  const MAX = [100, 125, 150, 175, 200, 250];
   // Jedes geparkte Auto bekommt eine feste Farbe
   LEVEL.forEach(l => l.hindernisse.forEach((h, i) => { h.farbe = FARBEN[(i * 3 + l.start.x) % FARBEN.length]; }));
   // Gemalte Autos von oben (12 Stück, Opel-Farben) reihum auf die geparkten Autos verteilen; ohne Bild bleibt die Zeichnung
@@ -54,7 +56,7 @@
   let autoNr = 0;
   LEVEL.forEach(l => l.hindernisse.forEach(h => { if (h.art === 'auto') h.bild = autoNr++ % FREMDE.length; }));
 
-  let lv, wagen, pfad, route, strecke, zeichnet, phase, phaseT, leben, punkte, meldung, wackeln, funken, schonGezogen;
+  let lv, wagen, pfad, route, strecke, zeichnet, phase, phaseT, versuch, letzterUnfall, punkte, meldung, wackeln, funken, schonGezogen, lueckenPunkte;
   let ansicht = new DOMMatrix(), umkehr = new DOMMatrix();
 
   // Pflaster-Bild: enthält genau 5 × 4 Steinmuster; 130 Einheiten breit = ein Stein gut halb so breit wie ein Auto
@@ -64,7 +66,8 @@
 
   // Eigenes Auto: gemalt von oben (Front oben), grüne Karosserie wird in die Kundenfarbe umgefärbt.
   // Am Bild abgemessen: Auto 1686 px lang, Mitte bei y 887, Dach von y 632 bis 1360.
-  const SPIELERAUTO = new Image(), BILD_LAENGE = 1686, BILD_MITTE = 887, DACH = [632, 1360];
+  // Maße in Pixeln des Originalbilds (1774 hoch); die Datei selbst ist verkleinert, umgerechnet wird über BILD_HOEHE
+  const SPIELERAUTO = new Image(), BILD_HOEHE = 1774, BILD_LAENGE = 1686, BILD_MITTE = 887, DACH = [632, 1360];
   let spielerAuto = null;
   const KEGEL = new Image();   // Leitkegel von oben (auf die Fußplatte zugeschnitten)
   KEGEL.src = 'bilder/leitkegel.webp';
@@ -85,7 +88,7 @@
     // #luecke=4 hinter der Adresse startet direkt bei Parklücke 4 (zum Testen)
     const sprung = /luecke=(\d)/.exec(location.hash);
     lv = sprung ? Math.max(0, Math.min(LEVEL.length - 1, sprung[1] - 1)) : 0;
-    leben = LEBEN; punkte = 0; schonGezogen = false;
+    versuch = 1; letzterUnfall = false; punkte = 0; schonGezogen = false; lueckenPunkte = [];
     neuerVersuch();
   }
   function neuerVersuch() {
@@ -199,24 +202,24 @@
       if (kollision()) crash();
       else if (strecke >= gesamt) pruefen();
       else parksensor(dt);
-    } else if (phase === 'crash' && phaseT > 1.3) {
-      if (leben <= 0) { phase = 'aus'; R_.ende(punkte, { ueberschrift: 'Zu viele Beulen!', verzoegerung: 200 }); }
-      else neuerVersuch();
-    } else if (phase === 'daneben' && phaseT > 1.3) {
-      neuerVersuch();
+    } else if ((phase === 'crash' || phase === 'daneben') && phaseT > 1.3) {
+      if (versuch >= VERSUCHE) {
+        phase = 'aus';
+        R_.ende(0, { ueberschrift: letzterUnfall ? 'Zu viele Beulen' : 'Nicht eingeparkt', auswertung: auswertung(), verzoegerung: 200 });
+      } else { versuch++; neuerVersuch(); }
     } else if (phase === 'geparkt' && phaseT > 1.5) {
       if (lv === LEVEL.length - 1) {
         phase = 'aus';
         R_.ton('sieg');
-        R_.ende(punkte, { ueberschrift: 'Alle Lücken geschafft!', verzoegerung: 200 });
-      } else { lv++; neuerVersuch(); }
+        R_.ende(punkte, { ueberschrift: punkte >= 900 ? 'Millimeterarbeit' : punkte >= 800 ? 'Einpark-Profi' : punkte >= 700 ? 'Alle Lücken geschafft' : punkte >= 550 ? 'Passt schon' : 'Hauptsache drin', auswertung: auswertung(), verzoegerung: 200 });
+      } else { lv++; versuch = 1; neuerVersuch(); }
     }
     // Motor: Leerlauf, solange man die Linie zieht; beim Fahren dreht er je nach Tempo höher
     voegel.stellen(phase === 'aus' ? 0 : 1);   // Vögel auf dem Hof, leise unter der Musik
     motorLeerlauf.stellen(phase === 'zeichnen' ? 1 : phase === 'fahren' ? 0.35 : 0);
     motorFahrt.stellen(phase === 'fahren' ? 1 : 0, 0.8 + tempo / TEMPO * 0.45);
     if (meldung) meldung.t += dt;
-    R_.anzeige(`Parklücke ${Math.min(lv + 1, LEVEL.length)}/${LEVEL.length}`, '♥'.repeat(leben) + '♡'.repeat(LEBEN - leben) + '  ' + punkte + ' P');
+    R_.anzeige(`Lücke ${Math.min(lv + 1, LEVEL.length)}/${LEVEL.length} – Versuch ${versuch}/${VERSUCHE}`, punkte.toLocaleString('de-DE') + ' P');
   }
 
   // Parksensor: piept schneller, je näher das Auto einem Hindernis kommt (wie beim Parkassistenten)
@@ -237,32 +240,46 @@
   }
 
   function crash() {
-    leben--;
+    letzterUnfall = true;
     phase = 'crash'; phaseT = 0; wackeln = 0.4;
     meldung = { text: 'Blechschaden!', farbe: '#ff6b6b', t: 0 };
-    R_.ton('crash');
+    R_.ton('crash'); R_.vibrieren([200, 80, 200]);
     for (let i = 0; i < 18; i++) {
       const a = Math.random() * P * 2, v = 60 + Math.random() * 160;
       funken.push({ x: wagen.x, y: wagen.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: Math.random() * 0.2 });
     }
   }
 
+  // Für das Endbild: Punkte je Lücke; nicht gespielte Lücken grau, die Lücke ohne Erfolg (alle Versuche weg) rot mit 0
+  function auswertung() {
+    return {
+      kopf: 'Deine Lücken',
+      zeilen: MAX.map((m, i) => {
+        const p = lueckenPunkte[i];
+        if (p != null) return { name: 'Lücke ' + (i + 1), anteil: p / m, wert: String(p), max: '/' + m };
+        const gescheitert = i === lv && phase === 'aus';   // hier waren alle Versuche weg
+        return { name: 'Lücke ' + (i + 1), anteil: gescheitert ? 0 : null, wert: gescheitert ? '0' : '–', max: gescheitert ? '/' + m : '', schlecht: gescheitert };
+      }),
+    };
+  }
+
   function pruefen() {
     const z = LEVEL[lv].ziel;
     if (!ecken(wagenBox()).every(p => innen(p, z, 3))) {
-      phase = 'daneben'; phaseT = 0;
-      meldung = { text: 'Nicht ganz drin – nochmal!', farbe: '#fff', t: 0 };
-      R_.ton('hupe');
+      phase = 'daneben'; phaseT = 0; letzterUnfall = false;
+      meldung = { text: versuch < VERSUCHE ? 'Nicht ganz drin – nochmal!' : 'Nicht ganz drin!', farbe: '#fff', t: 0 };
+      R_.ton('hupe'); R_.vibrieren(80);
       return;
     }
     const versatz = Math.hypot(wagen.x - z.x, wagen.y - z.y);
     const spiel = Math.max(4, (z.w - AB) / 2 + (z.h - AL) / 2);
     let dw = ((wagen.a - z.a) % P + P) % P;
     if (dw > P / 2) dw = P - dw;
-    const p = Math.max(30, Math.round(100 - 35 * Math.min(1, versatz / spiel) - 35 * Math.min(1, dw / 0.3)));
-    punkte += p;
+    const anteil = Math.max(30, Math.round(100 - 35 * Math.min(1, versatz / spiel) - 35 * Math.min(1, dw / 0.3))) / 100;
+    const p = Math.round(anteil * MAX[lv]);
+    punkte += p; lueckenPunkte[lv] = p;
     phase = 'geparkt'; phaseT = 0;
-    meldung = { text: (p >= 90 ? 'Perfekt geparkt!' : p >= 70 ? 'Sauber!' : 'Geparkt – passt schon') + '  +' + p, farbe: F.akzent, t: 0 };
+    meldung = { text: (anteil >= 0.9 ? 'Perfekt geparkt' : anteil >= 0.7 ? 'Sauber' : 'Geparkt – passt schon') + '  ' + p + '/' + MAX[lv], farbe: F.akzent, t: 0 };
     R_.ton('handbremse');                       // Handbremse ziehen, dann Tür zu
     setTimeout(() => R_.ton('tuer'), 450);
   }
@@ -436,7 +453,8 @@
     }
     if (mitLogo && spielerAuto) {
       const s = AL / BILD_LAENGE, dy = ((DACH[0] + DACH[1]) / 2 - BILD_MITTE) * s, dl = (DACH[1] - DACH[0]) * s;
-      g.drawImage(spielerAuto, -spielerAuto.width * s / 2, -BILD_MITTE * s, spielerAuto.width * s, spielerAuto.height * s);
+      const k = BILD_HOEHE / spielerAuto.height * s;
+      g.drawImage(spielerAuto, -spielerAuto.width * k / 2, -BILD_MITTE * s, spielerAuto.width * k, spielerAuto.height * k);
       // Logo längs aufs Dach (von hinten nach vorne lesbar)
       g.save(); g.translate(0, dy); g.rotate(-Math.PI / 2);
       R_.zeichneLogo(g, -dl * 0.42, -AB * 0.2, dl * 0.84, AB * 0.4, null, R_.textFarbe(farbe) !== '#ffffff');
@@ -469,13 +487,14 @@
   }
 
   R_.spiel({
-    id: 'autohaus-einparken',
+    id: 'einparken',   // seit der Umstellung auf 1.000 Punkte neuer Name: Bestwerte zählen neu
     wertung: 'hoch',
-    format: p => p + ' Punkte',
+    format: p => p.toLocaleString('de-DE') + ' Punkte',
+    hoechst: 1000,
     texte: {
       titel: 'Einparken',
       untertitel: 'Passt du in jede Lücke?',
-      anleitung: 'Zieh mit dem Finger eine Linie vom Auto in die markierte Parklücke – das Auto fährt sie nach. Je gerader und mittiger, desto mehr Punkte. Drei Beulen, dann ist Schluss.',
+      anleitung: 'Zieh mit dem Finger eine Linie vom Auto in die markierte Parklücke – das Auto fährt sie nach. Je gerader und mittiger, desto mehr Punkte. Pro Lücke drei Versuche – sonst 0 Punkte.',
       ende: 'Einparken auf Knopfdruck? Unsere Neuwagen helfen mit Kamera und Parkassistent.',
     },
     // Aufnahmen (Pixabay Content License); 'crash' ersetzt den erzeugten Ton gleichen Namens
@@ -483,14 +502,14 @@
       crash: { datei: 'klaenge/blechschaden.wav', pegel: 0.5 },
       tuer: { datei: 'klaenge/tuer-zu.wav', pegel: 0.45 },
       parksensor: { datei: 'klaenge/parksensor.wav', pegel: 0.28 },
-      motorLeerlauf: { datei: 'klaenge/motor-leerlauf.wav', pegel: 0.25 },
-      motorFahrt: { datei: 'klaenge/motor-fahrt.wav', pegel: 0.3 },
-      parkplatz: { datei: 'klaenge/parkplatz.wav', pegel: 0.12 },
-      musik: { datei: 'klaenge/musik.wav', pegel: 0.08 },   // leise Hintergrundmusik (Pixabay, bombinsound)
+      motorLeerlauf: { datei: 'klaenge/motor-leerlauf.mp3', proben: 132300, pegel: 0.25 },
+      motorFahrt: { datei: 'klaenge/motor-fahrt.mp3', proben: 134505, pegel: 0.3 },
+      parkplatz: { datei: 'klaenge/parkplatz.mp3', proben: 176400, pegel: 0.12 },
+      musik: { datei: 'klaenge/musik.mp3', proben: 441000, pegel: 0.08 },   // leise Hintergrundmusik (Pixabay, bombinsound)
       handbremse: { datei: 'klaenge/handbremse.wav', pegel: 0.45 },
       hupe: { datei: 'klaenge/hupe.wav', pegel: 0.35 },   // falsch geparkt
-      sieg: { datei: 'klaenge/sieg.wav', pegel: 0.45 },
-      bestwert: { datei: 'klaenge/bestwert.wav', pegel: 0.4 },
+      sieg: { datei: 'klaenge/sieg.mp3', proben: 72765, pegel: 0.45 },
+      bestwert: { datei: 'klaenge/bestwert.mp3', proben: 37485, pegel: 0.4 },
       klick: { datei: 'klaenge/klick.wav', pegel: 0.35 },
     },
     schleife: 'musik',

@@ -5,6 +5,5 @@ window.KUNDE = {
   farben: { haupt: '#f7d900', akzent: '#f7d900', dunkel: '#0d0d0d', hell: '#ffffff' },
   texte: {
     titel: 'Gas & Spaß',
-    untertitel: 'Zocken im Autohaus',
   },
 };

@@ -146,9 +146,23 @@
       clips[name] = fetch(c.datei)
         .then(r => r.arrayBuffer())
         .then(b => new Promise((ok, nein) => ac.decodeAudioData(b, ok, nein)))
+        .then(b => c.proben ? mp3Zuschnitt(b, c.proben) : b)
         .catch(() => null);
       clips[name].then(b => { clips[name + ':fertig'] = b; });
     });
+  }
+  // MP3 bringt vorn 1105 Proben Stille (bei 22,05 kHz) und hinten Füllstille mit. Manche Browser schneiden sie weg,
+  // andere nicht (Chrome nicht). Mit der echten Länge (proben) wird genau auf den Klang zugeschnitten –
+  // sonst stocken Dauertöne in der Schleife und kurze Töne kämen 50 ms zu spät.
+  function mp3Zuschnitt(b, proben) {
+    const RATE = 22050, VORLAUF = 1105;
+    const ueber = b.duration * RATE - proben;
+    if (ueber < 2) return b;                                  // Browser hat schon zugeschnitten
+    const ab = Math.round((ueber >= VORLAUF - 4 ? VORLAUF : 0) / RATE * b.sampleRate);
+    const laenge = Math.min(b.length - ab, Math.round(proben / RATE * b.sampleRate));
+    const neu = ac.createBuffer(b.numberOfChannels, laenge, b.sampleRate);
+    for (let k = 0; k < b.numberOfChannels; k++) neu.getChannelData(k).set(b.getChannelData(k).subarray(ab, ab + laenge));
+    return neu;
   }
   function spieleClip(name) {
     const b = clips[name + ':fertig'];
@@ -225,6 +239,11 @@
     a.resume().then(() => { if (a.state === 'running' && performance.now() - seit < 500) spielen(); }).catch(() => {});
   }
 
+  // Vibration bei Fehlern und Unfällen (nur Android; iPhones erlauben es Webseiten nicht – dort passiert einfach nichts)
+  function vibrieren(muster) {
+    try { if (navigator.vibrate) navigator.vibrate(muster); } catch (e) { /* Vibration ist Nebensache */ }
+  }
+
   // ---------- Speicher (Bestwert, Ton an/aus) ----------
   function lesen(k) { try { return localStorage.getItem('mg:' + k); } catch (e) { return null; } }
   function schreiben(k, v) { try { localStorage.setItem('mg:' + k, v); } catch (e) { /* privat / gesperrt */ } }
@@ -235,6 +254,7 @@
     tonAus: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>',
     voll: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
     klein: '<svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>',
+    uhr: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M10 2h4"/></svg>',
     heim: '<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
   };
   // Zurück zur Startseite mit allen Spielen (nur wenn kunde.js eine startseite nennt)
@@ -250,14 +270,15 @@
     <div class="schirm" id="startSchirm"><div class="karte">
       <img class="logo" alt="">
       <h1 class="titel"></h1><p class="unter"></p><p class="anleitung"></p>
-      <p class="bestwert"></p>
+      <div class="besttafel" hidden><div class="name">Dein Bestwert</div><div class="zahl"></div></div>
       <button class="knopf" id="losKnopf" type="button">Los geht's</button>
       ${heim ? `<a class="knopf zweit" href="${heim}">Zum Menü</a>` : ''}
       <p class="quellen"></p>
     </div></div>
     <div class="schirm" id="endSchirm" hidden><div class="karte">
       <img class="logo" alt="">
-      <h1 class="ueberschrift"></h1><div class="wert"></div><p class="bestwert"></p><p class="text"></p>
+      <h1 class="ueberschrift"></h1><div class="wert"></div><div class="zeit" hidden>${SYM.uhr}<span></span></div>
+      <div class="auswertung" hidden><p class="kopf"></p><div class="zeilen"></div></div><p class="bestwert"></p><p class="text"></p>
       <a class="knopf" id="kundeKnopf" target="_blank" rel="noopener" hidden></a>
       <button class="knopf zweit" id="nochmalKnopf" type="button">Nochmal spielen</button>
       ${heim ? `<a class="knopf zweit" href="${heim}">Zum Menü</a>` : ''}
@@ -305,7 +326,16 @@
     $('#startSchirm .unter').textContent = texte.untertitel || '';
     $('#startSchirm .anleitung').textContent = texte.anleitung || '';
     const b = lesen(bestKey());
-    $('#startSchirm .bestwert').textContent = b != null ? 'Dein Bestwert: ' + zahl(+b) : '';
+    // Bestwert als Tafel: Zahl groß, Rest klein („854/1.000 Punkte“). Noch nicht gespielt: bei Punkten 0, bei Zeiten nichts
+    const tafel = $('#startSchirm .besttafel'), tz = tafel.querySelector('.zahl');
+    tafel.hidden = b == null && S.wertung === 'niedrig';
+    if (!tafel.hidden) {
+      const text = zahl(b == null ? 0 : +b), lz = text.indexOf(' ');
+      tz.textContent = lz < 0 ? text : text.slice(0, lz);
+      const e = document.createElement('small');
+      e.textContent = S.hoechst ? '/' + zahl(S.hoechst) : (lz < 0 ? '' : ' ' + text.slice(lz + 1));
+      tz.append(e);
+    }
     $('#startSchirm .quellen').textContent = S.quellen || '';
     $('#startSchirm').hidden = false;
     $('#endSchirm').hidden = true;
@@ -328,12 +358,20 @@
     dauertoeneAus();
     extra = extra || {};
     const alt = lesen(bestKey());
-    const neu = besser(punkte, alt == null ? null : +alt);
+    // 0 Punkte (z. B. Spiel nach Unfall beendet) zählen nie als Bestwert
+    const neu = !(S.wertung !== 'niedrig' && punkte <= 0) && besser(punkte, alt == null ? null : +alt);
     if (neu) schreiben(bestKey(), punkte);
     $('#endSchirm .ueberschrift').textContent = extra.ueberschrift || texte.endeTitel || 'Geschafft!';
-    $('#endSchirm .wert').textContent = zahl(punkte);
+    // Zahl groß, Einheit klein dahinter („536 Punkte“); darunter optional die Zeit als Plakette
+    const wert = $('#endSchirm .wert'), text = zahl(punkte), lz = text.indexOf(' ');
+    wert.textContent = lz < 0 ? text : text.slice(0, lz);
+    if (lz >= 0) { const e = document.createElement('small'); e.textContent = text.slice(lz + 1); wert.append(e); }
+    const zeit = $('#endSchirm .zeit');
+    zeit.hidden = !extra.zusatz;
+    zeit.querySelector('span').textContent = extra.zusatz || '';
+    auswertung(extra.auswertung);
     const bw = $('#endSchirm .bestwert');
-    bw.textContent = neu ? (alt == null ? 'Dein erster Bestwert!' : 'Neuer Bestwert!') : 'Dein Bestwert: ' + zahl(+alt);
+    bw.textContent = neu ? (alt == null ? 'Dein erster Bestwert!' : 'Neuer Bestwert!') : 'Dein Bestwert: ' + zahl(alt == null ? 0 : +alt);
     bw.classList.toggle('neu', neu);
     $('#endSchirm .text').textContent = extra.text || texte.ende || '';
     const kk = $('#kundeKnopf'), kn = K.knopf || {};
@@ -343,6 +381,31 @@
       $('#endSchirm').hidden = false;
       if (neu && alt != null) ton('bestwert');
     }, extra.verzoegerung != null ? extra.verzoegerung : 900);
+  }
+
+  // Auswertung im Endbild: eine Zeile je Runde mit Balken, die schwächste Runde rot.
+  // a = { kopf: 'Deine Lücken', zeilen: [{ name, zusatz, anteil (0–1, null = nicht gespielt), wert, max, schlecht }] }
+  function auswertung(a) {
+    const box = $('#endSchirm .auswertung'), liste = box.querySelector('.zeilen');
+    box.hidden = !(a && a.zeilen && a.zeilen.length);
+    liste.textContent = '';
+    if (box.hidden) return;
+    box.querySelector('.kopf').textContent = a.kopf || '';
+    const gespielt = a.zeilen.filter(z => z.anteil != null);
+    const schwach = gespielt.length > 1 ? gespielt.reduce((m, z) => z.anteil < m.anteil ? z : m) : null;
+    const el = (tag, klasse, text) => { const e = document.createElement(tag); if (klasse) e.className = klasse; if (text != null) e.textContent = text; return e; };
+    a.zeilen.forEach(z => {
+      const zeile = el('div', 'zeile' + (z.anteil == null ? ' offen' : '') + (z.schlecht || z === schwach ? ' schlecht' : ''));
+      const name = el('span', 'name', z.name);
+      if (z.zusatz) name.append(' ', el('small', '', z.zusatz));
+      const balken = el('span', 'balken'), fuell = el('i');
+      fuell.style.width = Math.round(Math.max(0, Math.min(1, z.anteil || 0)) * 100) + '%';
+      balken.append(fuell);
+      const wert = el('span', 'zahl', z.wert);
+      if (z.max) wert.append(el('small', '', z.max));
+      zeile.append(name, balken, wert);
+      liste.append(zeile);
+    });
   }
 
   $('#losKnopf').addEventListener('click', starten);
@@ -400,7 +463,7 @@
   window.Rahmen = {
     kunde: K, farben, textFarbe, toenen, mitAlpha, umfaerben,
     zeichneLogo, get logoBereit() { return logoBereit; },
-    ton, dauerton, ende, anzeige,
+    ton, dauerton, vibrieren, ende, anzeige,
     get zustand() { return zustand; },
     spiel(def) {
       S = def;
