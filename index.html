@@ -96,6 +96,15 @@
   .spiel:nth-child(2) { animation-delay: .55s; }
   .spiel:nth-child(3) { animation-delay: .65s; }
   .balken.unten { animation: kopfRein .5s .8s ease-out both; }
+  /* Beim Laden einmal: Rad dreht sich, P wird größer, Bremse leuchtet zweimal auf (Nutzerwunsch) */
+  @keyframes pGross { 50% { transform: scale(1.35); } }
+  @keyframes aufleuchten {
+    0%, 50%, 100% { box-shadow: 0 6px 18px rgba(0,0,0,.35); filter: none; }
+    25%, 75% { box-shadow: 0 0 28px 8px color-mix(in srgb, var(--haupt) 70%, transparent); filter: brightness(1.2); }
+  }
+  .spiel:nth-child(1) .icon svg { animation: drehen 1.2s 1s ease-in-out both; }
+  .spiel:nth-child(2) .icon svg { animation: pGross .9s 1.3s ease-in-out both; }
+  .spiel:nth-child(3) .icon { animation: aufleuchten 1.4s 1.6s ease-in-out both; }
   .spiel:hover .icon { animation: wackeln .5s ease-in-out; }
   .spiel:first-child:hover .icon svg { animation: drehen 1s ease-in-out; }   /* das Rad dreht sich */
   .spiel:hover .icon { box-shadow: 0 8px 22px rgba(0,0,0,.45); }
