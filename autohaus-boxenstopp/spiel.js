@@ -28,7 +28,8 @@
       bild: 'bilder/rad-6.webp', nabe: 0.19, lochkreis: 0.31, mutter: 0.055, versatz: Math.PI / 6, merken: 1, schwingen: [0.06, 2.1] },
     // Runde 7 (Nutzer, 18.10.2026): Movano – größtes Rad (225/75 R16 auf Stahlfelge), dreht schneller, wechselt öfter die Richtung
     { name: 'Großer Transporter', muttern: 6, dreh: 1.6, groesse: 1.03, felge: 0.56, tipps: 2, wechsel: 1.6, farbe: ['#c9ced4', '#9aa1a9', '#626971'],
-      bild: 'bilder/rad-7.webp', nabe: 0.155, lochkreis: 0.3, mutter: 0.05, versatz: Math.PI / 6, merken: 1, schwingen: [0.09, 2.6] },
+      bild: 'bilder/rad-7.webp', nabe: 0.16, lochkreis: 0.21, mutter: 0.045, versatz: 0,   // LKW-Stahlfelge: Muttern eng um die Nabe, 4 Lüftungslöcher außen (Nutzer, 18.10.2026)
+      merken: 1, schwingen: [0.09, 2.6] },
   ];
   // Eigene Fahrzeugnamen aus kunde.js (z. B. Modelle der Marke des Autohauses)
   (R_.kunde.fahrzeuge || []).forEach((n, i) => { if (RAEDER[i] && n) RAEDER[i].name = n; });
