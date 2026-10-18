@@ -112,10 +112,6 @@
     }
     return true;
   }
-  function innen(p, o, tol) {
-    const [u, v] = achsen(o), dx = p[0] - o.x, dy = p[1] - o.y;
-    return Math.abs(dx * u[0] + dy * u[1]) <= o.w / 2 + tol && Math.abs(dx * v[0] + dy * v[1]) <= o.h / 2 + tol;
-  }
   function wagenBox() { return { x: wagen.x, y: wagen.y, w: AB, h: AL, a: wagen.a }; }
   function kollision() {
     const box = wagenBox();
@@ -264,22 +260,32 @@
 
   function pruefen() {
     const z = LEVEL[lv].ziel;
-    if (!ecken(wagenBox()).every(p => innen(p, z, 3))) {
+    // Punkte nach dem Platz bis zur Linie der Lücke (Nutzerwunsch, großzügig):
+    //  – ganz drin: 50 % (Ecke an der Linie) bis 100 % (genau mittig und gerade)
+    //  – steht über: bis zu einer Autobreite drüber gibt es noch weniger als 50 % bis 1 Punkt
+    //  – noch weiter drüber: Fehlversuch
+    // Für jede Ecke wird gemessen, wie weit sie quer und längs von der Mitte der Lücke weg ist (3 Einheiten Nachsicht).
+    const [u, v] = achsen(z), X = z.w / 2 + 3, Y = z.h / 2 + 3;
+    let quer = 0, laengs = 0;
+    ecken(wagenBox()).forEach(([px, py]) => {
+      const dx = px - z.x, dy = py - z.y;
+      quer = Math.max(quer, Math.abs(dx * u[0] + dy * u[1]));
+      laengs = Math.max(laengs, Math.abs(dx * v[0] + dy * v[1]));
+    });
+    const ueber = Math.max(quer - X, laengs - Y);   // wie weit das Auto über die Linie ragt (≤ 0 = ganz drin)
+    if (ueber > AB) {
       phase = 'daneben'; phaseT = 0; letzterUnfall = false;
-      meldung = { text: versuch < VERSUCHE ? 'Nicht ganz drin – nochmal!' : 'Nicht ganz drin!', farbe: '#fff', t: 0 };
+      meldung = { text: versuch < VERSUCHE ? 'Nicht drin – nochmal!' : 'Nicht drin!', farbe: '#fff', t: 0 };
       R_.ton('hupe'); R_.vibrieren(80);
       return;
     }
-    const versatz = Math.hypot(wagen.x - z.x, wagen.y - z.y);
-    const spiel = Math.max(4, (z.w - AB) / 2 + (z.h - AL) / 2);
-    let dw = ((wagen.a - z.a) % P + P) % P;
-    if (dw > P / 2) dw = P - dw;
-    // Versatz und Schräglage kosten je bis zu 50 %: perfekt = volle Punkte, gerade noch drin = 1 Punkt
-    const anteil = Math.max(0, 1 - 0.5 * Math.min(1, versatz / spiel) - 0.5 * Math.min(1, dw / 0.3));
+    const luft = Math.max(0, Math.min(1, (X - quer) / (X - AB / 2), (Y - laengs) / (Y - AL / 2)));
+    const anteil = ueber > 0 ? 0.5 * (1 - ueber / AB) : 0.5 + 0.5 * luft;
     const p = Math.max(1, Math.round(anteil * MAX[lv]));
     punkte += p; lueckenPunkte[lv] = p;
     phase = 'geparkt'; phaseT = 0;
-    meldung = { text: (anteil >= 0.9 ? 'Perfekt geparkt' : anteil >= 0.7 ? 'Sauber' : 'Geparkt – passt schon') + '  ' + p + '/' + MAX[lv], farbe: F.akzent, t: 0 };
+    const lob = ueber > 0 ? (anteil >= 0.4 ? 'Okay' : anteil >= 0.2 ? 'Gerade noch so' : 'Bitte üben') : anteil >= 0.9 ? 'Perfekt geparkt' : anteil >= 0.7 ? 'Sauber' : 'Geparkt – passt schon';
+    meldung = { text: lob + '  ' + p + '/' + MAX[lv], farbe: ueber > 0 ? '#fff' : F.akzent, t: 0 };
     R_.ton('handbremse');                       // Handbremse ziehen, dann Tür zu
     setTimeout(() => R_.ton('tuer'), 450);
   }
