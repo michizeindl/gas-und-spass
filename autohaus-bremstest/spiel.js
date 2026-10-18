@@ -91,7 +91,7 @@
   // Die Stufengrenzen 900/800/700/550 sind in allen Spielen gleich. Ein Unfall beendet das Spiel mit 0 Punkten.
   const ZU_FRUEH = 0.2;   // Strafzeit in Sekunden je zu frühem Tippen (Nutzerwunsch)
   const ZU_FRUEH_MAX = 3; // so oft im ganzen Spiel zu früh = Spielende mit 0 Punkten
-  const PUNKTE = [[0.4, 1000], [0.5, 900], [0.6, 800], [0.75, 700], [0.9, 550], [1.5, 150]];
+  const PUNKTE = [[0.4, 1000], [0.5, 900], [0.6, 800], [0.75, 700], [0.9, 550], [1.5, 150], [2, 1]];   // ab Ø 2s nur noch 1 Punkt
   function punkteAus(t) {
     if (t <= PUNKTE[0][0]) return PUNKTE[0][1];
     for (let i = 1; i < PUNKTE.length; i++) {
@@ -683,6 +683,7 @@
       motor: { datei: 'klaenge/motor-fahrt.mp3', proben: 242550, pegel: 0.3 },
       bremsen: { datei: 'klaenge/bremsen.wav', pegel: 0.5 },
       hupe: { datei: 'klaenge/hupe.wav', pegel: 0.35 },
+      fehler: { datei: 'klaenge/fehler.wav', pegel: 0.3 },   // wie beim Reifenwechsel (Pixabay)
       gut: { datei: 'klaenge/gut.wav', pegel: 0.4 },
       regen: { datei: 'klaenge/regen.mp3', proben: 242550, pegel: 0.35 },
       nacht: { datei: 'klaenge/nacht.mp3', proben: 242550, pegel: 0.3 },

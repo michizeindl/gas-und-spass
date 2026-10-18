@@ -41,7 +41,8 @@
   const BEREIT = 3;     // Countdown 3 – 2 – 1, dann LOS (passend zu klaenge/start.mp3)
   // Zeit → Punkte (höchstens 1.000, wie in allen Spielen), dazwischen gleichmäßig verteilt.
   // Die Stufengrenzen 900/800/700/550 sind in allen Spielen gleich.
-  const PUNKTE = [[15, 1000], [20, 900], [25, 800], [32, 700], [40, 550], [70, 150]];
+  const ZU_LANGSAM = 120;   // Sekunden (mit Strafzeit): danach Spielende „Zu langsam“ mit 0 Punkten (Nutzerwunsch)
+  const PUNKTE = [[15, 1000], [20, 900], [25, 800], [32, 700], [40, 550], [70, 150], [100, 1]];   // ab 100s nur noch 1 Punkt
 
   let rad, muttern, naechste, zeit, strafe, radStart, radZeiten, winkel, richtung, richtungT, phase, phaseT, wackeln, schilder, ansage, startTon;
   // Geometrie, wird beim Zeichnen berechnet: R = Rad, FR = Felge, LK = Lochkreis, MG = Muttergröße, NB = Nabenkappe
@@ -108,6 +109,12 @@
     }
     else if (phase === 'rad') {
       zeit += dt;
+      if (zeit + strafe >= ZU_LANGSAM && R_.zustand === 'spiel') {   // Zeit abgelaufen: Spielende mit 0 Punkten
+        phase = 'aus';
+        R_.ton('fehler'); R_.vibrieren([200, 80, 200]);
+        R_.ende(0, { ueberschrift: 'Zu langsam', auswertung: auswertung(true), verzoegerung: 300 });
+        return;
+      }
       if (r.wechsel) { richtungT += dt; if (richtungT > r.wechsel) { richtungT = 0; richtung = -richtung; } }
       winkel += r.dreh * richtung * dt;
     }
@@ -119,17 +126,27 @@
       R_.ende(punkteAus(t), {
         ueberschrift: t < 20 ? 'Formel-1-Niveau' : t < 25 ? 'Profi-Mechaniker' : t < 32 ? 'Gute Arbeit' : t < 40 ? 'Passt schon' : 'Endlich fertig',
         zusatz: sekunden(t),
-        auswertung: {
-          // Balken im Verhältnis zu einer flotten Zeit für dieses Rad (je Mutter und Tipp 0,45 s), damit große Räder nicht unfair wirken
-          zeilen: radZeiten.map(z => {
-            const r = RAEDER[z.rad], flott = r.muttern * (r.tipps || 1) * 0.45;
-            return { name: r.name, zusatz: z.strafe ? '+' + Math.round(z.strafe) + 's' : '', anteil: Math.min(1, flott / z.t), wert: sekunden(z.t) };
-          }),
-        },
+        auswertung: auswertung(false),
       });
     }
     const nr = Math.min(rad, RAEDER.length - 1);
     R_.anzeige(`Runde ${nr + 1}/${RAEDER.length} – ${RAEDER[nr].name}`, sekunden(zeit + strafe));
+  }
+
+  // Für das Endbild: Zeit je Fahrzeug. Balken im Verhältnis zu einer flotten Zeit für dieses Rad
+  // (je Mutter und Tipp 0,45 s), damit große Räder nicht unfair wirken. Bei „Zu langsam“: aktuelles Rad rot, Rest grau.
+  function auswertung(abgebrochen) {
+    return {
+      zeilen: RAEDER.map((r, i) => {
+        const z = radZeiten.find(x => x.rad === i);
+        if (z) {
+          const flott = r.muttern * (r.tipps || 1) * 0.45;
+          return { name: r.name, zusatz: z.strafe ? '+' + Math.round(z.strafe) + 's' : '', anteil: Math.min(1, flott / z.t), wert: sekunden(z.t) };
+        }
+        if (abgebrochen && i === rad) return { name: r.name, anteil: 0, wert: 'Aus', schlecht: true };
+        return abgebrochen ? { name: r.name, anteil: null, wert: '–' } : null;
+      }).filter(Boolean),
+    };
   }
 
   function runter(x, y) {

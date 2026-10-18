@@ -274,8 +274,9 @@
     const spiel = Math.max(4, (z.w - AB) / 2 + (z.h - AL) / 2);
     let dw = ((wagen.a - z.a) % P + P) % P;
     if (dw > P / 2) dw = P - dw;
-    const anteil = Math.max(30, Math.round(100 - 35 * Math.min(1, versatz / spiel) - 35 * Math.min(1, dw / 0.3))) / 100;
-    const p = Math.round(anteil * MAX[lv]);
+    // Versatz und Schräglage kosten je bis zu 50 %: perfekt = volle Punkte, gerade noch drin = 1 Punkt
+    const anteil = Math.max(0, 1 - 0.5 * Math.min(1, versatz / spiel) - 0.5 * Math.min(1, dw / 0.3));
+    const p = Math.max(1, Math.round(anteil * MAX[lv]));
     punkte += p; lueckenPunkte[lv] = p;
     phase = 'geparkt'; phaseT = 0;
     meldung = { text: (anteil >= 0.9 ? 'Perfekt geparkt' : anteil >= 0.7 ? 'Sauber' : 'Geparkt – passt schon') + '  ' + p + '/' + MAX[lv], farbe: F.akzent, t: 0 };

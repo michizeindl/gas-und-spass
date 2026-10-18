@@ -241,6 +241,8 @@
 
   // Vibration bei Fehlern und Unfällen (nur Android; iPhones erlauben es Webseiten nicht – dort passiert einfach nichts)
   function vibrieren(muster) {
+    const ua = navigator.userActivation;   // Browser erlauben Vibration erst nach dem ersten echten Tippen
+    if (ua && !ua.hasBeenActive) return;
     try { if (navigator.vibrate) navigator.vibrate(muster); } catch (e) { /* Vibration ist Nebensache */ }
   }
 
