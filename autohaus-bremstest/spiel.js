@@ -751,7 +751,9 @@
   function kennzeichen(g, schluessel, links, oben, w, h) {
     const lage = KENNZEICHEN[schluessel];
     if (!lage) return;
-    const nr = nummerVon[schluessel] || (nummerVon[schluessel] = freieNummern.pop());
+    // gleiches Fahrzeug, gleiche Nummer: das Wohnmobil wechselt beim Bremsen das Bild (Bremslichter an) – Nutzer, 19.10.2026
+    const wer = schluessel.replace('-an.webp', '.webp');
+    const nr = nummerVon[wer] || (nummerVon[wer] = freieNummern.pop());
     const kw = w * lage[2], kh = kw * 110 / 520;
     if (kw < 7) return;   // in der Ferne nicht zu erkennen
     const x0 = links + w * lage[0] - kw / 2, y0 = oben + h * lage[1] - kh / 2;
