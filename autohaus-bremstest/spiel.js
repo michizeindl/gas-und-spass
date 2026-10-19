@@ -40,7 +40,7 @@
   let schilder = [], baeume = [];
   let haseX = -6;
   let kuppe = null;   // Weltposition der Kuppe (nur Fahrt mit kuppe)
-  let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, lkw, holzT, ergebnisse, zuFrueh, zuFruehGesamt, wackeln, rehX, ballX, zahlen, blink;
+  let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, lkw, holzT, hoelzer = [], staub = [], ergebnisse, zuFrueh, zuFruehGesamt, wackeln, rehX, ballX, zahlen, blink;
   let B = 0, H = 0;
 
   function neu() {
@@ -73,8 +73,9 @@
     // vorausfahrendes Auto (nur bei „auto“): fährt im Abstand vor einem her
     auto = f.gefahr === 'auto' ? { pos: v0 * FAIR + 2, v: v0, bremst: false, farbe: AUTOFARBEN[nr % AUTOFARBEN.length] } : null;
     // LKW mit offener Ladetür (nur bei „ladung“): fährt so weit vorne, dass das herunterfallende Holz fair liegt
-    lkw = f.gefahr === 'ladung' ? { pos: v0 * FAIR + bremsweg(f) + 2.5, v: v0 } : null;
-    holzT = 0;
+    // (+8 m: die einzelnen Kanthölzer fallen hinter ihm herunter und rutschen bis vor die faire Stelle)
+    lkw = f.gefahr === 'ladung' ? { pos: v0 * FAIR + bremsweg(f) + 8, v: v0 } : null;
+    holzT = 0; hoelzer = []; staub = [];
     // Kuppe: der Stau steht von Anfang an fest (hinter dem Kamm verborgen) und taucht auf, wenn die Gefahr beginnt
     kuppe = null; stauSichtbar = false;
     if (f.kuppe) { ziel = v0 * tEreignis + kuppenSicht(f); kuppe = ziel - f.kuppe; }
@@ -164,7 +165,7 @@
       else v = Math.max(0, v - a * dt);
       s += v * dt;
       if (auto) { auto.v = Math.max(0, auto.v - a * dt); auto.pos += auto.v * dt; }
-      if (lkw) { lkw.v += 3 * dt; lkw.pos += lkw.v * dt; if (holzT < 0.35 && holzT + dt >= 0.35) R_.ton('holz'); holzT += dt; }   // der LKW fährt weiter, das Holz bleibt liegen
+      if (lkw) { lkw.v += 3 * dt; lkw.pos += lkw.v * dt; holzT += dt; hoelzerBewegen(dt); }   // der LKW fährt weiter, die Kanthölzer fallen, prallen auf und rutschen
       if (f.gefahr === 'reh') rehX = Math.max(0, rehX - dt * 9);
       if (f.gefahr === 'hase') haseX = Math.min(0, haseX + dt * 10);   // kommt von links
       if (f.gefahr === 'ball') ballX -= dt * 4.5;
@@ -197,7 +198,7 @@
     if (auto) { auto.bremst = true; return; }
     if (kuppe != null) return;   // Stau steht schon hinter der Kuppe
     ziel = s + v0 * FAIR + bremsweg(f) + 1.5;
-    if (lkw) ziel = lkw.pos - 1;   // Holz fällt direkt hinter dem LKW auf die Straße
+    if (lkw) hoelzerLosfallen();   // vier Kanthölzer fallen nacheinander aus der offenen Ladetür
   }
 
   function gestoppt(f) {
@@ -291,7 +292,7 @@
     // Fahrt 6 (Nacht): Reisebus, Pick-up, Kleinwagen, Sattelzug als Nachtbild (Original Material/Bilder/stau-nacht-4.webp)
     nachtBus: bild('nacht-bus.webp'), nachtPickup: bild('nacht-pickup.webp'), nachtKleinwagen: bild('nacht-kleinwagen.webp'), nachtSattelzug: bild('nacht-sattelzug.webp'),
     wohnmobil: bild('wohnmobil.webp'), wohnmobilAn: bild('wohnmobil-an.webp'),   // zweites Bild: Bremslichter an (Original Material/Bilder/wohnmobil-hinten-bremslicht.webp)   // Fahrt 6: rotes Fließheck und blaue Limousine (ChatGPT, Original Material/Bilder/stau-autos-rot-blau.webp)
-    lkw: bild('lkw-ladung.webp'), holz: bild('holz.webp') };   // LKW und Holz: ChatGPT (Originale in Material/Bilder)
+    lkw: bild('lkw-ladung.webp'), hoelzer: [1, 2, 3, 4].map(i => bild(`holz-${i}.webp`)) };   // LKW und Holz: ChatGPT (Originale in Material/Bilder)
 
   // Graues Auto in eine Opel-Farbe umlackieren: nur helle, ungesättigte Flächen (Karosserie), Scheiben und Lichter bleiben
   const lackiert = {};
@@ -332,12 +333,13 @@
     }
     const farben = {
       tag: ['#7fb6e8', '#d9ecf8'], regen: ['#7d8590', '#b8bec6'], nebel: ['#c9ced4', '#e4e7ea'], nacht: ['#05070f', '#141a2b'],
-    }[f.wetter];
+      sonne: ['#9cc4e8', '#fff2d0'],   // fehlte – ohne geladenes Panorama stürzte Fahrt 7 sonst ab (schwarzer Bildschirm)
+    }[f.wetter] || ['#7fb6e8', '#d9ecf8'];
     const v = g.createLinearGradient(0, 0, 0, hz);
     v.addColorStop(0, farben[0]); v.addColorStop(1, farben[1]);
     g.fillStyle = v; g.fillRect(0, 0, B, hz + 1);
     // Wiese bis nach vorne
-    const gras = { tag: ['#6a9a4a', '#3f7032'], regen: ['#566f47', '#334a2c'], nebel: ['#8fa088', '#5f7856'], nacht: ['#0c120c', '#1a2618'] }[f.wetter];
+    const gras = { tag: ['#6a9a4a', '#3f7032'], regen: ['#566f47', '#334a2c'], nebel: ['#8fa088', '#5f7856'], nacht: ['#0c120c', '#1a2618'] }[f.wetter] || ['#6a9a4a', '#3f7032'];
     const w = g.createLinearGradient(0, hz, 0, H);
     w.addColorStop(0, gras[0]); w.addColorStop(1, gras[1]);
     g.fillStyle = w; g.fillRect(0, hz, B, H - hz);
@@ -688,7 +690,7 @@
     if (auto) return autoHinten(g, -0, auto.pos - s, auto.farbe, auto.bremst, false);
     if (lkw) {   // erst das Holz (näher), dann der LKW dahinter – von hinten nach vorne zeichnen
       lkwHinten(g, lkw.pos - s);
-      if (ziel != null && ziel - s > 1) holz(g, ziel - s);
+      hoelzerZeichnen(g);
       return;
     }
     if (ziel == null) return;
@@ -836,13 +838,71 @@
     g.drawImage(BILD.lkw, x, y, w, h);
     kennzeichen(g, 'lkw-ladung.webp', x, y, w, h);
   }
-  // Heruntergefallenes Holz: 3 m breit (quer über die Spur verstreut), fällt in 0,35 s von der Ladekante auf die Straße
-  function holz(g, z) {
-    if (!fertig(BILD.holz)) return;
-    const m = mProM(z), w = 3.0 * m, h = w * BILD.holz.naturalHeight / BILD.holz.naturalWidth;
-    const fall = Math.max(0, 1 - holzT / 0.35) ** 2 * 1.1 * m;
-    g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(xZ(0, z), yZ(z), 1.1 * m, 0.1 * m, 0, 0, P * 2); g.fill();
-    g.drawImage(BILD.holz, xZ(0, z) - w / 2, yZ(z) - h * 0.95 - fall, w, h);
+  // Kanthölzer (Nutzer, 19.10.2026; ChatGPT, Original Material/Bilder/kanthoelzer-4.webp, freigestellt holz-1…4, 1,7–2,5 m lang):
+  // fallen nacheinander aus der Ladetür (0,16 s Abstand), drehen sich im Fall, prallen auf (Poltern, Staub), hüpfen kurz
+  // und rutschen dann bergab 1,4–2,4 m auf einen zu. Ihre Endlage beginnt genau bei ziel (fairer Anhalteweg) – vorher
+  // sind sie immer weiter weg, der Aufprall wird weiter über ziel gerechnet.
+  const HOLZ_LAENGE = [1.67, 1.92, 2.21, 2.49], HOLZ_FALL = 0.42, HOLZ_HUEPF = 0.22, HOLZ_RUTSCH = 0.95;
+  function hoelzerLosfallen() {
+    const reihe = [0, 1, 2, 3].sort(() => Math.random() - 0.5), ende = [0, 1.3, 2.7, 4.2];   // gut verteilt, nicht übereinander
+    hoelzer = reihe.map((bildNr, i) => {
+      const rutsch = 1.4 + Math.random() * 1.0, F = ziel + ende[i];
+      return { bildNr, laenge: HOLZ_LAENGE[bildNr], x: -1.3 + Math.random() * 2.6, los: i * 0.16, F, L: F + rutsch, start: null,
+        z: null, hoch: 1.15, winkel: (Math.random() - 0.5) * 0.6, dreh: (Math.random() < 0.5 ? -1 : 1) * (3 + Math.random() * 4),
+        endWinkel: (Math.random() - 0.5) * 0.24, gelandet: false };
+    });
+  }
+  const easeOut = u => 1 - (1 - u) * (1 - u);
+  function staubWolke(x, z, menge) {
+    for (let k = 0; k < menge; k++) staub.push({ x: x + (Math.random() - 0.5) * 1.6, z: z + (Math.random() - 0.5) * 0.8, t: 0, dauer: 0.9 + Math.random() * 0.6, gross: 0.6 + Math.random() * 0.8 });
+  }
+  function hoelzerBewegen(dt) {
+    for (const h of hoelzer) {
+      const tt = holzT - h.los;
+      if (tt < 0) continue;
+      if (h.start == null) { h.start = lkw.pos - 0.3; h.landWinkel = h.winkel; }
+      if (tt < HOLZ_FALL) {   // Fall von der Ladekante (1,15 m) mit Drehung
+        const u = tt / HOLZ_FALL;
+        h.z = h.start + (h.L - h.start) * u; h.hoch = 1.15 * (1 - u * u); h.winkel = h.landWinkel + h.dreh * tt;
+      } else {
+        if (!h.gelandet) {
+          h.gelandet = true; h.aufWinkel = h.winkel;
+          R_.ton(['holz', 'holz-2', 'holz-3'][Math.floor(Math.random() * 3)]);
+          if (h === hoelzer[0] || h === hoelzer[2]) R_.ton('rutschen');   // Schrammen über den Asphalt (nicht bei jedem, sonst zu laut)
+          staubWolke(h.x, h.L, 4);
+        }
+        const tb = tt - HOLZ_FALL;
+        h.hoch = tb < HOLZ_HUEPF ? 0.2 * Math.sin(tb / HOLZ_HUEPF * P) : 0;   // kurzer Hüpfer
+        const u = Math.min(1, tb / HOLZ_RUTSCH);
+        h.z = h.L - (h.L - h.F) * easeOut(u);                               // rutscht bergab auf einen zu
+        h.winkel = h.aufWinkel + (h.endWinkel - h.aufWinkel) * easeOut(Math.min(1, tb / 0.3));
+        if (u < 1 && Math.random() < dt * 6) staubWolke(h.x, h.z, 1);       // etwas Staub beim Rutschen
+      }
+    }
+    for (const p of staub) p.t += dt;
+    staub = staub.filter(p => p.t < p.dauer);
+  }
+  function hoelzerZeichnen(g, ohneStaub) {
+    const sichtbar = hoelzer.filter(h => h.z != null && h.z - s > 1.2).sort((a, b) => b.z - a.z);
+    for (const h of sichtbar) {
+      const bildH = BILD.hoelzer[h.bildNr];
+      if (!fertig(bildH)) continue;
+      const z = h.z - s, m = mProM(z), w = h.laenge * m, hh = w * bildH.naturalHeight / bildH.naturalWidth;
+      g.save();
+      g.translate(xZ(h.x, z), yZ(z) - h.hoch * m - hh * 0.4);
+      g.rotate(h.winkel);
+      g.drawImage(bildH, -w / 2, -hh / 2, w, hh);
+      g.restore();
+    }
+    if (ohneStaub) return;
+    for (const p of staub) {   // Staubwolken: wachsen und verblassen, hell im Gegenlicht
+      const z = p.z - s;
+      if (z < 1.2) continue;
+      const m = mProM(z), u = p.t / p.dauer, r = (0.3 + p.gross * u) * m, x = xZ(p.x, z), y = yZ(z) - (0.2 + 0.6 * u) * m;
+      const v = g.createRadialGradient(x, y, 0, x, y, r);
+      v.addColorStop(0, `rgba(232,214,180,${0.45 * (1 - u)})`); v.addColorStop(1, 'rgba(232,214,180,0)');
+      g.fillStyle = v; g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
   }
   // Feldhase (ChatGPT, aus Material/Bilder/lkw-hase-holz.webp): 0,9 m (im Spiel etwas größer als echt), hoppelt von links
   // in kurzen, schnellen Sprüngen auf die Fahrbahn (Nutzerwunsch); das Bild schaut schon nach rechts, also nicht spiegeln
@@ -937,7 +997,7 @@
     } else if (f.wetter === 'sonne') {
       sonne(g);
       // das Holz auf der Straße bleibt im Gegenlicht schwach erkennbar (sonst wäre es nicht fair zu sehen)
-      if (lkw && ziel != null && ziel - s > 1) { g.save(); g.globalAlpha = 0.6; holz(g, ziel - s); g.restore(); }
+      if (lkw && hoelzer.length) { g.save(); g.globalAlpha = 0.6; hoelzerZeichnen(g, true); g.restore(); }
     } else if (f.wetter === 'regen') {
       g.strokeStyle = 'rgba(220,230,245,.45)'; g.lineWidth = 1;
       const t = performance.now() / 1000;
@@ -1025,7 +1085,7 @@
     return { x: (B - w) / 2, y: H - h, w, h, armaturen: H - h + h * SCHEIBE_UNTEN };
   }
 
-  let dachStreifen = null;
+  let dachStreifen = null, drehzahlJetzt = 0, drehzahlZeit = 0;
   // Regentropfen auf der Scheibe (ChatGPT, kachelbar, Original Material/Bilder/regentropfen.webp, Nutzer 18.10.2026):
   // Beim Wisch nach oben verschwinden sie im überstrichenen Bereich, danach sammeln sie sich bis zum nächsten Wisch wieder.
   const TROPFEN = bild('regentropfen.webp'), WISCH = { periode: 1.6, dauer: 1.1, achsen: [[0.3, 0.42], [0.62, 0.38]] };
@@ -1133,7 +1193,11 @@
     // außen (Tank, Motortemperatur) bleiben stehen – die ändern sich auf einer kurzen Fahrt nicht.
     {
       const k = ck.w / 1536, kv = Math.max(0, v || 0) * 3.6, t = performance.now() / 1000;
-      const drehzahl = kv < 1 ? 800 + 15 * Math.sin(t * 7) : 800 + kv * 22 + 35 * Math.sin(t * 9) + 20 * Math.sin(t * 23);
+      // Steht das Auto, geht der Motor aus – die Drehzahl fällt auf 0 (Nutzer, 19.10.2026);
+      // weich nachgeführt, damit die Nadel nicht springt
+      const ziel2 = kv < 1 ? 0 : 800 + kv * 22 + 35 * Math.sin(t * 9) + 20 * Math.sin(t * 23);
+      drehzahlJetzt += (ziel2 - drehzahlJetzt) * Math.min(1, (t - (drehzahlZeit || t)) * 6); drehzahlZeit = t;
+      const drehzahl = drehzahlJetzt;
       const nadel = (mx, my, r, anteil) => {
         const x = ck.x + mx * k, y = ck.y + my * k * (ck.h / ck.w) * (1536 / 1024), rr = r * k;
         const a0 = 141 * P / 180, a = a0 + Math.max(0, Math.min(1, anteil)) * 256 * P / 180;
@@ -1251,6 +1315,9 @@
       ball: { datei: 'klaenge/ball.mp3', proben: 11024, pegel: 0.25 },   // dumpf, wie durch die Scheibe
       wischer: { datei: 'klaenge/wischer.mp3', proben: 22932, pegel: 0.22 },
       holz: { datei: 'klaenge/holz.mp3', proben: 30428, pegel: 1 },   // verdichtet, damit der Aufschlag laut genug ist
+      'holz-2': { datei: 'klaenge/holz-2.mp3', proben: 37107, pegel: 0.85 },   // tiefer (dickeres Holz)
+      'holz-3': { datei: 'klaenge/holz-3.mp3', proben: 24940, pegel: 0.8 },    // höher
+      rutschen: { datei: 'klaenge/rutschen.mp3', proben: 27563, pegel: 0.5 },   // Holz schrammt über den Asphalt (Pixabay, freesound_community 90317)
       blinker: { datei: 'klaenge/blinker.mp3', proben: 43473, pegel: 0.3 },
       musik: { datei: 'klaenge/musik.mp3', proben: 606375, pegel: 0.07 },   // leise Hintergrundmusik (Pixabay, Red Skies – Late Night Ride)
       sieg: { datei: 'klaenge/sieg.mp3', proben: 71663, pegel: 0.45 },
