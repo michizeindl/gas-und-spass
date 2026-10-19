@@ -267,6 +267,7 @@
     PERS = (unten - hz) * NAH;
     scheibeOben = ck.y;
     hzLand = hz + (f.steigung || 0) / 100 * PERS / AUGE * 1.1;
+    if (!(PERS > 1)) return;   // Fenster (noch) zu klein, z. B. beim Umschalten – sonst Fehler mit negativen Maßen
 
     rueckstrahler = [];
     himmel(g, f);
@@ -482,6 +483,24 @@
       : { bild: STRASSE, links: STRASSE_LINKS, rechts: STRASSE_RECHTS, laenge: STRASSE_LAENGE, pfosten: true, gruen: 'gras' };
   }
 
+  // Verkleinerte Stufen eines Bilds (je halb so groß) gegen Flimmern in der Ferne – für Straße und Seitenstreifen
+  // (Nutzer, 19.10.2026: nach dem Rasen flimmerten Straße und Seitenstreifen)
+  const stufenListe = new Map();
+  function stufenVon(bildQ) {
+    if (stufenListe.has(bildQ)) return stufenListe.get(bildQ);
+    const stufen = [bildQ];
+    let v = bildQ, vw = bildQ.naturalWidth, vh = bildQ.naturalHeight;
+    while (stufen.length < 7) {
+      const n = document.createElement('canvas');
+      n.width = Math.max(8, vw >> 1); n.height = Math.max(8, vh >> 1);
+      const ng = n.getContext('2d'); ng.imageSmoothingQuality = 'high'; ng.drawImage(v, 0, 0, n.width, n.height);
+      stufen.push(n); v = n; vw = n.width; vh = n.height;
+    }
+    stufenListe.set(bildQ, stufen);
+    return stufen;
+  }
+  const stufeFuer = (proZeile, proSpalte) => Math.max(0, Math.min(6, Math.floor(Math.log2(Math.max(1, proZeile, proSpalte)))));
+
   function strasseBild(g, f) {
     const st = strasseJetzt(f), iw = st.bild.naturalWidth, ih = st.bild.naturalHeight;
     const sf = STREIFEN[st.gruen], gruen = sf && fertig(sf.bild), tn = landToenung(f);
@@ -498,7 +517,9 @@
         g.drawImage(r, 0, gy, r.width, 1, xr - ue, y, b, h);
         g.drawImage(l, 0, gy, l.width, 1, xl + ue - b, y, b, h);
       }
-      g.drawImage(st.bild, 0, (1 - anteil) * (ih - 1), iw, 1, xl, y, xr - xl, h);
+      const sb = stufenVon(st.bild)[stufeFuer(z * z / PERS * ih / st.laenge, iw / Math.max(1, xr - xl))];
+      const sbh = sb.naturalHeight || sb.height, sbw = sb.naturalWidth || sb.width;
+      g.drawImage(sb, 0, (1 - anteil) * (sbh - 1), sbw, 1, xl, y, xr - xl, h);
     };
     const zK = kuppenAbstand();
     // Zeile für Zeile: jede Bildschirmzeile zeigt die Straße in ihrer Entfernung z (bei einer Kuppe nur bis zum Kamm)
@@ -707,11 +728,53 @@
   // Breite mit Spiegeln in Metern (Fahrt-4-Bild: 0,006 m je Bildpunkt, damit die Größen untereinander stimmen)
   const STAU_BREITE = { transporter: 2.21, kombi: 2.09, suv: 2.14, lkw: 2.36, nachtBus: 2.78, nachtPickup: 2.13, nachtKleinwagen: 1.85, nachtSattelzug: 2.36 };
   // Stehendes Auto am Stauende als fertiges Bild: Bremslichter an, Warnblinker im Takt (breite in Metern, mit Spiegeln)
+  // Kennzeichen „PA ZM 12“ (Nutzer, 19.10.2026: alle PA-ZM, je Fahrzeug eine andere zweistellige Zahl).
+  // Lage am Bild abgemessen: Mitte x/y und Breite als Anteil der Bildbreite/-höhe (echtes Schild 520 × 110 mm)
+  const KENNZEICHEN = {
+    'wohnmobil.webp': [0.5, 0.80, 0.27], 'wohnmobil-an.webp': [0.5, 0.80, 0.27], 'stau-transporter.webp': [0.5, 0.86, 0.26],
+    'stau-kombi.webp': [0.5, 0.56, 0.24], 'stau-suv.webp': [0.5, 0.57, 0.24], 'stau-lkw.webp': [0.5, 0.81, 0.2],
+    'stau-blau.webp': [0.5, 0.66, 0.24], 'stau-rot.webp': [0.5, 0.63, 0.24], 'nacht-bus.webp': [0.5, 0.78, 0.2],
+    'nacht-pickup.webp': [0.5, 0.70, 0.24], 'nacht-kleinwagen.webp': [0.5, 0.72, 0.25], 'nacht-sattelzug.webp': [0.5, 0.84, 0.2],
+    'lkw-ladung.webp': [0.36, 0.765, 0.15], 'auto-hinten': [0.5, 0.64, 0.25],
+  };
+  const freieNummern = Array.from({ length: 90 }, (_, i) => i + 10).sort(() => Math.random() - 0.5), nummerVon = {};
+  function kennzeichen(g, schluessel, links, oben, w, h) {
+    const lage = KENNZEICHEN[schluessel];
+    if (!lage) return;
+    const nr = nummerVon[schluessel] || (nummerVon[schluessel] = freieNummern.pop());
+    const kw = w * lage[2], kh = kw * 110 / 520;
+    if (kw < 7) return;   // in der Ferne nicht zu erkennen
+    const x0 = links + w * lage[0] - kw / 2, y0 = oben + h * lage[1] - kh / 2;
+    g.save();
+    g.fillStyle = '#202020'; g.beginPath(); g.roundRect(x0, y0, kw, kh, kh * 0.14); g.fill();
+    g.fillStyle = '#f4f4ef'; g.beginPath(); g.roundRect(x0 + kh * 0.06, y0 + kh * 0.06, kw - kh * 0.12, kh * 0.88, kh * 0.1); g.fill();
+    g.fillStyle = '#0039a6'; g.fillRect(x0 + kh * 0.06, y0 + kh * 0.06, kw * 0.075, kh * 0.88);   // EU-Streifen
+    if (kw > 40) {
+      g.fillStyle = '#fff'; g.font = `700 ${kh * 0.28}px Arial, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('D', x0 + kh * 0.06 + kw * 0.0375, y0 + kh * 0.72);
+    }
+    // Schrift: PA, zwei Plaketten, ZM 12
+    g.fillStyle = '#111'; g.textBaseline = 'middle'; g.textAlign = 'left';
+    g.font = `700 ${kh * 0.7}px "Arial Narrow", Arial, sans-serif`;
+    const t1 = 'PA', t2 = 'ZM ' + nr, b1 = g.measureText(t1).width, b2 = g.measureText(t2).width, lp = kh * 0.42;
+    const frei = kw * 0.9 - kh * 0.12, ges = b1 + lp + b2, k = Math.min(1, frei * 0.92 / ges);
+    let x = x0 + kw * 0.09 + (frei - ges * k) / 2, ym = y0 + kh * 0.53;
+    g.save(); g.translate(x, ym); g.scale(k, 1); g.fillText(t1, 0, 0); g.restore();
+    x += (b1 + lp * 0.5) * k;
+    g.fillStyle = '#5a7a3a'; g.beginPath(); g.arc(x, ym - kh * 0.17, kh * 0.13, 0, P * 2); g.fill();   // Plaketten
+    g.fillStyle = '#b8862b'; g.beginPath(); g.arc(x, ym + kh * 0.17, kh * 0.13, 0, P * 2); g.fill();
+    x += lp * 0.5 * k;
+    g.fillStyle = '#111'; g.save(); g.translate(x, ym); g.scale(k, 1); g.fillText(t2, 0, 0); g.restore();
+    g.restore();
+  }
+  const dateiName = b => (b.src || '').split('/').pop();
+
   function stauAuto(g, bildA, x, z, breite, licht, bremst = true, warn = true) {
     if (z < 1.5) z = 1.5;
     const m = mProM(z), w = breite * m, bh = w * bildA.naturalHeight / bildA.naturalWidth, cx = xZ(x, z), y = yZ(z);
     g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(cx, y - bh * 0.01, w * 0.5, bh * 0.05, 0, 0, P * 2); g.fill();
     g.drawImage(bildA, cx - w / 2, y - bh, w, bh);
+    kennzeichen(g, dateiName(bildA), cx - w / 2, y - bh, w, bh);
     g.save(); g.globalCompositeOperation = 'lighter';
     const glanz = (farbe2, r, punkte) => { for (const [lx, ly] of punkte) { const px = cx - w / 2 + w * lx, py = y - bh + bh * ly; const v = g.createRadialGradient(px, py, 0, px, py, r); v.addColorStop(0, farbe2); v.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = v; g.fillRect(px - r, py - r, r * 2, r * 2); } };
     if (bremst) glanz('rgba(255,30,10,.9)', w * 0.28, licht.seiten.concat([licht.oben]));
@@ -727,6 +790,7 @@
       const bh = w * bildAuto.height / bildAuto.width;
       g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(cx, y - bh * 0.01, w * 0.55, bh * 0.05, 0, 0, P * 2); g.fill();
       g.drawImage(bildAuto, cx - w / 2, y - bh, w, bh);
+      kennzeichen(g, 'auto-hinten', cx - w / 2, y - bh, w, bh);
       // Licht strahlt: Bremslichter rot, Warnblinker orange (Lichter bei 40 % Höhe, 17 % und 83 % Breite)
       g.save(); g.globalCompositeOperation = 'lighter';
       const glanz = (farbe2, r, mitDritter) => { for (const [lx, ly] of [[0.17, 0.4], [0.83, 0.4]].concat(mitDritter ? [[0.5, 0.08]] : [])) { const px = cx - w / 2 + w * lx, py = y - bh + bh * ly; const v = g.createRadialGradient(px, py, 0, px, py, r); v.addColorStop(0, farbe2); v.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = v; g.fillRect(px - r, py - r, r * 2, r * 2); } };
@@ -757,6 +821,7 @@
     const x = xZ(0, z) - w * (354 / 968), y = yZ(z) - h * 0.965;
     g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(xZ(0, z), yZ(z), 1.3 * m, 0.12 * m, 0, 0, P * 2); g.fill();
     g.drawImage(BILD.lkw, x, y, w, h);
+    kennzeichen(g, 'lkw-ladung.webp', x, y, w, h);
   }
   // Heruntergefallenes Holz: 3 m breit (quer über die Spur verstreut), fällt in 0,35 s von der Ladekante auf die Straße
   function holz(g, z) {
@@ -1046,6 +1111,38 @@
         }
       }
       g.restore();
+    }
+    // Runde Anzeigen mit eigenen Nadeln (Nutzer, 19.10.2026): links Drehzahl (roter Bereich am Ende), rechts Tempo.
+    // Mitte/Radius im Cockpit-Bild (1536 × 1024) abgemessen; Skala beginnt unten links (141°) und läuft 256° im Uhrzeigersinn.
+    // Die gemalten Nadeln (in Nullstellung) werden mit der Farbe des Ziffernblatts übermalt. Die kleinen Anzeigen ganz
+    // außen (Tank, Motortemperatur) bleiben stehen – die ändern sich auf einer kurzen Fahrt nicht.
+    {
+      const k = ck.w / 1536, kv = Math.max(0, v || 0) * 3.6, t = performance.now() / 1000;
+      const drehzahl = kv < 1 ? 800 + 15 * Math.sin(t * 7) : 800 + kv * 22 + 35 * Math.sin(t * 9) + 20 * Math.sin(t * 23);
+      const nadel = (mx, my, r, anteil) => {
+        const x = ck.x + mx * k, y = ck.y + my * k * (ck.h / ck.w) * (1536 / 1024), rr = r * k;
+        const a0 = 141 * P / 180, a = a0 + Math.max(0, Math.min(1, anteil)) * 256 * P / 180;
+        g.save(); g.lineCap = 'round';
+        g.strokeStyle = 'rgb(10,12,14)'; g.lineWidth = Math.max(3, 10 * k);   // gemalte Nadel abdecken
+        g.beginPath(); g.moveTo(x + Math.cos(a0) * rr * 0.25, y + Math.sin(a0) * rr * 0.25); g.lineTo(x + Math.cos(a0) * rr * 0.92, y + Math.sin(a0) * rr * 0.92); g.stroke();
+        g.shadowColor = 'rgba(255,255,255,.6)'; g.shadowBlur = 4 * k;
+        g.strokeStyle = '#f2f4f7'; g.lineWidth = Math.max(1.2, 3.2 * k);
+        g.beginPath(); g.moveTo(x + Math.cos(a) * rr * 0.38, y + Math.sin(a) * rr * 0.38); g.lineTo(x + Math.cos(a) * rr * 0.93, y + Math.sin(a) * rr * 0.93); g.stroke();
+        g.restore();
+      };
+      nadel(570.7, 629.3, 61, drehzahl / 7000);   // Drehzahl 0–7.000/min
+      nadel(775, 629.3, 61.7, kv / 260);           // Tempo 0–260 km/h
+      // Kleine Anzeigen ganz außen (Nutzer: nicht auf 0): links Tank ¾ voll, rechts Motortemperatur im Normalbereich.
+      // Kreis am Bild eingepasst; Winkel in Grad (Bildschirm: 0° = rechts, 90° = unten)
+      const kurz = (mx, my, r, grad) => {
+        const x = ck.x + mx * k, y = ck.y + my * k, rr = r * k, a = grad * P / 180;
+        g.save(); g.lineCap = 'round'; g.shadowColor = 'rgba(255,255,255,.6)'; g.shadowBlur = 3 * k;
+        g.strokeStyle = '#f2f4f7'; g.lineWidth = Math.max(1, 2.4 * k);
+        g.beginPath(); g.moveTo(x + Math.cos(a) * rr * 0.45, y + Math.sin(a) * rr * 0.45); g.lineTo(x + Math.cos(a) * rr * 0.88, y + Math.sin(a) * rr * 0.88); g.stroke();
+        g.restore();
+      };
+      kurz(496.6, 656, 23.8, 88 + 0.75 * 163);   // Tank: unten leer (88°) über links bis oben voll (251°)
+      kurz(847.5, 655.6, 24.5, 82 - 0.5 * 148);  // Temperatur: unten kalt (82°) über rechts bis oben heiß (−66°)
     }
     // Digitaler Tacho
     const tx = ck.x + ck.w * TACHO[0], ty = ck.y + ck.h * TACHO[1], fs = Math.max(13, ck.w * 0.028);
