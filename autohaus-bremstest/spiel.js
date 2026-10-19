@@ -165,7 +165,9 @@
       else v = Math.max(0, v - a * dt);
       s += v * dt;
       if (auto) { auto.v = Math.max(0, auto.v - a * dt); auto.pos += auto.v * dt; }
-      if (lkw) { lkw.v += 3 * dt; lkw.pos += lkw.v * dt; holzT += dt; hoelzerBewegen(dt); }   // der LKW fährt weiter, die Kanthölzer fallen, prallen auf und rutschen
+      if (lkw) { lkw.v += 3 * dt; lkw.pos += lkw.v * dt; holzT += dt; hoelzerBewegen(dt); }
+      // Fahrt 7: Bremsquietschen über die ganze lange Bremsung bergab (Klang ist nur 1 s lang, ging im Poltern unter – Nutzer, 19.10.2026)
+      if (lkw && phase === 'bremsen' && v > 4 && Math.floor((phaseT - dt) / 0.95) < Math.floor(phaseT / 0.95)) R_.ton('bremsen');   // der LKW fährt weiter, die Kanthölzer fallen, prallen auf und rutschen
       if (f.gefahr === 'reh') rehX = Math.max(0, rehX - dt * 9);
       if (f.gefahr === 'hase') haseX = Math.min(0, haseX + dt * 10);   // kommt von links
       if (f.gefahr === 'ball') ballX -= dt * 4.5;
@@ -1334,10 +1336,10 @@
       kinder: { datei: 'klaenge/kinder.mp3', proben: 242550, pegel: 0.16 },
       ball: { datei: 'klaenge/ball.mp3', proben: 11024, pegel: 0.25 },   // dumpf, wie durch die Scheibe
       wischer: { datei: 'klaenge/wischer.mp3', proben: 22932, pegel: 0.22 },
-      holz: { datei: 'klaenge/holz.mp3', proben: 30428, pegel: 1 },   // verdichtet, damit der Aufschlag laut genug ist
-      'holz-2': { datei: 'klaenge/holz-2.mp3', proben: 37107, pegel: 0.85 },   // tiefer (dickeres Holz)
-      'holz-3': { datei: 'klaenge/holz-3.mp3', proben: 24940, pegel: 0.8 },    // höher
-      rutschen: { datei: 'klaenge/rutschen.mp3', proben: 27563, pegel: 0.5 },   // Holz schrammt über den Asphalt (Pixabay, freesound_community 90317)
+      holz: { datei: 'klaenge/holz.mp3', proben: 30428, pegel: 0.75 },   // verdichtet, damit der Aufschlag laut genug ist (etwas leiser, damit das Bremsen hörbar bleibt)
+      'holz-2': { datei: 'klaenge/holz-2.mp3', proben: 37107, pegel: 0.65 },   // tiefer (dickeres Holz)
+      'holz-3': { datei: 'klaenge/holz-3.mp3', proben: 24940, pegel: 0.6 },    // höher
+      rutschen: { datei: 'klaenge/rutschen.mp3', proben: 27563, pegel: 0.4 },   // Holz schrammt über den Asphalt (Pixabay, freesound_community 90317)
       blinker: { datei: 'klaenge/blinker.mp3', proben: 43473, pegel: 0.3 },
       musik: { datei: 'klaenge/musik.mp3', proben: 606375, pegel: 0.07 },   // leise Hintergrundmusik (Pixabay, Red Skies – Late Night Ride)
       sieg: { datei: 'klaenge/sieg.mp3', proben: 71663, pegel: 0.45 },
