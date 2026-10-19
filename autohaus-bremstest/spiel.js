@@ -76,7 +76,7 @@
     lkw = f.gefahr === 'ladung' ? { pos: v0 * FAIR + bremsweg(f) + 2.5, v: v0 } : null;
     holzT = 0;
     // Kuppe: der Stau steht von Anfang an fest (hinter dem Kamm verborgen) und taucht auf, wenn die Gefahr beginnt
-    kuppe = null;
+    kuppe = null; stauSichtbar = false;
     if (f.kuppe) { ziel = v0 * tEreignis + kuppenSicht(f); kuppe = ziel - f.kuppe; }
   }
 
@@ -158,7 +158,7 @@
       s += v * dt;
       if (auto) auto.pos += auto.v * dt;
       if (lkw) lkw.pos += lkw.v * dt;
-      if (phaseT >= tEreignis) gefahrBeginnt(f);
+      if (phaseT >= tEreignis || stauSichtbar) gefahrBeginnt(f);   // Kuppe: Gefahr beginnt, sobald etwas vom Stau über den Kamm ragt
     } else if (phase === 'gefahr' || phase === 'bremsen') {
       if (phase === 'gefahr') gefahrT += dt;
       else v = Math.max(0, v - a * dt);
@@ -269,7 +269,7 @@
     hzLand = hz + (f.steigung || 0) / 100 * PERS / AUGE * 1.1;
     if (!(PERS > 1)) return;   // Fenster (noch) zu klein, z. B. beim Umschalten – sonst Fehler mit negativen Maßen
 
-    rueckstrahler = [];
+    rueckstrahler = []; verdecker = [];
     himmel(g, f);
     strasse(g, f);
     gefahrZeichnen(g, f);
@@ -620,7 +620,8 @@
   // Lage der Rückstrahler im Bild (Anteil der Höhe von oben), damit sie nachts leuchten können
   const PFOSTEN = { rechts: bild('leitpfosten-rechts.webp'), links: bild('leitpfosten-links.webp') };
   const STRAHLER = { rechts: [[0.27, 0.07]], links: [[0.22, 0.035], [0.317, 0.035]] };
-  let rueckstrahler = [];   // nachts gesammelt, nach dem Abdunkeln als Lichtpunkte gezeichnet
+  let rueckstrahler = [], verdecker = [];   // verdecker: Rechtecke der Fahrzeuge – Dorflichter/Rückstrahler dahinter nicht zeichnen
+  const verdeckt = (x, y) => verdecker.some(([x0, y0, x1, y1]) => x > x0 && x < x1 && y > y0 && y < y1);   // nachts gesammelt, nach dem Abdunkeln als Lichtpunkte gezeichnet
 
   // Verkehrsschilder (gemalt, auf Pfosten): 3 m hoch, Pfosten-Fuß in der Bildmitte, 3,4 m rechts der Kamera
   const SCHILD = {};
@@ -666,8 +667,17 @@
   }
 
   // ---------- Gefahren (gemalte Bilder, gezeichneter Ersatz solange sie laden) ----------
+  // Kuppe: Ragt irgendein Stau-Fahrzeug (auch ein hohes wie der LKW) schon über den Kamm, beginnt die Gefahr sofort –
+  // sonst sah man es kurz und das Tippen galt als „Zu früh“ (Nutzer, 19.10.2026)
+  let stauSichtbar = false;
   function gefahrZeichnen(g, f) {
-    if (kuppe != null && ziel != null) return hinterKuppe(g, ziel - s, () => gefahrBilder(g, f));
+    if (kuppe != null && ziel != null) {
+      const n = verdecker.length;
+      hinterKuppe(g, ziel - s, () => gefahrBilder(g, f));
+      const kamm = yZ(kuppenAbstand());
+      if (phase === 'fahren' && verdecker.slice(n).some(r => r[4] < kamm - 0.5)) stauSichtbar = true;
+      return;
+    }
     gefahrBilder(g, f);
   }
   function gefahrBilder(g, f) {
@@ -774,6 +784,7 @@
     const m = mProM(z), w = breite * m, bh = w * bildA.naturalHeight / bildA.naturalWidth, cx = xZ(x, z), y = yZ(z);
     g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(cx, y - bh * 0.01, w * 0.5, bh * 0.05, 0, 0, P * 2); g.fill();
     g.drawImage(bildA, cx - w / 2, y - bh, w, bh);
+    verdecker.push([cx - w * 0.45, y - bh * 0.95, cx + w * 0.45, y, y - bh * 0.97]);   // [.., Oberkante fürs Auftauchen hinter der Kuppe]   // Fahrzeug verdeckt Lichter dahinter
     kennzeichen(g, dateiName(bildA), cx - w / 2, y - bh, w, bh);
     g.save(); g.globalCompositeOperation = 'lighter';
     const glanz = (farbe2, r, punkte) => { for (const [lx, ly] of punkte) { const px = cx - w / 2 + w * lx, py = y - bh + bh * ly; const v = g.createRadialGradient(px, py, 0, px, py, r); v.addColorStop(0, farbe2); v.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = v; g.fillRect(px - r, py - r, r * 2, r * 2); } };
@@ -905,6 +916,7 @@
       // Rückstrahler der Leitpfosten leuchten im Scheinwerferlicht
       g.save(); g.globalCompositeOperation = 'lighter';
       for (const [x, y, r] of rueckstrahler) {
+        if (verdeckt(x, y)) continue;
         const v = g.createRadialGradient(x, y, 0, x, y, r * 2.2);
         v.addColorStop(0, 'rgba(255,240,215,.95)'); v.addColorStop(0.35, 'rgba(255,225,180,.45)'); v.addColorStop(1, 'rgba(255,210,150,0)');
         g.fillStyle = v; g.fillRect(x - r * 2.2, y - r * 2.2, r * 4.4, r * 4.4);
@@ -914,6 +926,7 @@
       const t = performance.now() / 1000, gr = Math.max(1, (unten - hz) / 140);
       DORFLICHTER.forEach(([fx, dy, h], i) => {
         const x = B * fx, y = hzLand + dy * gr, r = gr * (1 + h) * (i % 5 === 0 ? 0.8 + 0.2 * Math.sin(t * 3 + i) : 1);
+        if (verdeckt(x, y)) return;   // Dorf liegt hinter den Fahrzeugen
         const v = g.createRadialGradient(x, y, 0, x, y, r * 3);
         v.addColorStop(0, 'rgba(255,214,140,.95)'); v.addColorStop(0.3, 'rgba(255,190,110,.45)'); v.addColorStop(1, 'rgba(255,170,90,0)');
         g.fillStyle = v; g.fillRect(x - r * 3, y - r * 3, r * 6, r * 6);
