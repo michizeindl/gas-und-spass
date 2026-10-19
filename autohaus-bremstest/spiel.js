@@ -66,10 +66,10 @@
     if (warnung) schilder.push({ bild: SCHILD[warnung], pos: fruehesteGefahr * 0.8 });
     // Steigung bzw. Gefälle: Schild ganz vorne, noch vor dem Tempo-Schild (Fahrt 4: 8 %, Fahrt 7: 12 %)
     if (f.steigung) schilder.push({ bild: SCHILD[f.steigung > 0 ? 'steigung' : 'gefaelle'], pos: Math.max(14, fruehesteGefahr * 0.2) });
-    baeume = baeumePflanzen(f);
     // Werbeschild vom Autohaus links am Rand (4,5 m breit), weit vorne, damit es auch auf dem Handy lange ganz im Bild ist
     // Entfernung zum Autohaus wird jede Fahrt kürzer: Fahrt 1 noch 8 km, Fahrt 7 noch 2 km (Nutzer, 19.10.2026)
     schilder.push({ bild: WERBUNG, km: 8 - nr, pos: Math.max(70, fruehesteGefahr * 0.7), x: -7.6, hoehe: 3.2 });
+    baeume = baeumePflanzen(f);   // erst nach allen Schildern, damit kein Baum an einem Schild steht
     // vorausfahrendes Auto (nur bei „auto“): fährt im Abstand vor einem her
     auto = f.gefahr === 'auto' ? { pos: v0 * FAIR + 2, v: v0, bremst: false, farbe: AUTOFARBEN[nr % AUTOFARBEN.length] } : null;
     // LKW mit offener Ladetür (nur bei „ladung“): fährt so weit vorne, dass das herunterfallende Holz fair liegt
@@ -358,7 +358,7 @@
   // (130,5 Bildpunkte pro Meter), Kamera in der Mitte der rechten Hälfte (Straßenmitte 1,5 m links), keine Leitpfosten.
   const UMGEBUNGEN = {
     wohngebiet: { landschaft: 'landschaft-wohngebiet.webp', horizont: 318, strasse: 'strasse-wohngebiet.webp',
-      links: -1.5 - 513.5 / 130.5, rechts: -1.5 + 510.5 / 130.5, laenge: 1536 / 130.5, pfosten: false },
+      links: -1.5 - 513.5 / 130.5, rechts: -1.5 + 510.5 / 130.5, laenge: 1536 / 130.5, pfosten: false, gruen: false },
     // Streuobstwiese mit Apfelbäumen bei Regen (ganzes Bild 1536 × 1024, Augenhöhe Zeile 700, Original Material/Bilder/panorama-obstwiese.webp);
     // das Bild ist schon trüb – deshalb nur leicht abgetönt; Straße bleibt die Landstraße
     obstwiese: { landschaft: 'landschaft-obstwiese.webp', horizont: 700, toenung: 'rgba(70,78,88,.22)' },
@@ -380,19 +380,21 @@
     linde: { bild: bild('baum-linde.webp'), hoehe: 14 }, birke: { bild: bild('baum-birke.webp'), hoehe: 12 },
     fichte: { bild: bild('baum-fichte.webp'), hoehe: 17 }, apfel: { bild: bild('baum-apfel.webp'), hoehe: 6 },
   };
-  // Bäume stehen direkt auf dem Bankett am Rand des Straßenbilds (Allee) – weiter draußen zeigt nur das Panorama
-  // die ferne Landschaft, dort würden sie schweben (Nutzer, 19.10.2026). rand = Abstand innerhalb des Straßenbilds (m, negativ = nach innen)
+  // Bäume stehen auf dem Grünstreifen (rand = Abstand zum Rand des Straßenbilds in m); im Wohngebiet ohne Grünstreifen
+  // ganz außen am Straßenbild – weiter draußen zeigt nur das Panorama die ferne Landschaft, dort würden sie schweben (Nutzer, 19.10.2026)
   const BAEUME = {
-    landstrasse: { arten: ['linde', 'linde', 'birke'], abstand: [40, 90], rand: [-0.5, -0.2] },
-    wohngebiet: { arten: ['linde', 'apfel', 'apfel'], abstand: [30, 60], rand: [-0.5, -0.2] },
-    obstwiese: { arten: ['apfel'], abstand: [14, 26], rand: [-0.5, -0.2] },
-    wald: { arten: ['fichte', 'fichte', 'fichte', 'birke'], abstand: [8, 18], rand: [-0.4, -0.2] },
-    tal: { arten: ['fichte', 'fichte', 'birke'], abstand: [14, 30], rand: [-0.4, -0.2] },
+    landstrasse: { arten: ['linde', 'linde', 'birke'], abstand: [40, 90], rand: [0.8, 2.4] },
+    wohngebiet: { arten: ['linde', 'apfel', 'apfel'], abstand: [30, 60], rand: [-0.15, 0.1] },
+    obstwiese: { arten: ['apfel'], abstand: [14, 26], rand: [0.8, 2.4] },
+    wald: { arten: ['fichte', 'fichte', 'fichte', 'birke'], abstand: [8, 18], rand: [0.8, 2.4] },
+    tal: { arten: ['fichte', 'fichte', 'birke'], abstand: [14, 30], rand: [0.8, 2.4] },
   };
   function baeumePflanzen(f) {
     const art = BAEUME[f.umgebung] || BAEUME.landstrasse, liste = [], st = strasseJetzt(f);
     for (const seite of [1, -1]) {
       for (let pos = 8 + Math.random() * art.abstand[0]; pos < 800; pos += art.abstand[0] + Math.random() * (art.abstand[1] - art.abstand[0])) {
+        // kein Baum am Schild: auf derselben Seite Abstand halten (vor dem breiten Werbeschild 30 m frei, sonst verdeckt ein naher Baum die Tafel) – Nutzer, 19.10.2026
+        if (schilder.some(sch => Math.sign(sch.x || 3.4) === seite && (sch.km ? pos > sch.pos - 30 && pos < sch.pos + 10 : Math.abs(sch.pos - pos) < 6))) continue;
         const rand = art.rand[0] + Math.random() * (art.rand[1] - art.rand[0]);
         liste.push({ pos, x: seite > 0 ? st.rechts + rand : st.links - rand, art: art.arten[Math.floor(Math.random() * art.arten.length)],
           groesse: 0.8 + Math.random() * 0.4, spiegel: Math.random() < 0.5 });
@@ -413,9 +415,7 @@
     return (getoent[k] = c);
   }
   function baeumeZeichnen(g, f) {
-    const land = landschaftJetzt(f);
-    const toenung = f.wetter === 'sonne' || f.wetter === 'tag' ? null
-      : land.toenung || { regen: 'rgba(70,78,88,.6)', nebel: 'rgba(214,219,224,.7)', nacht: 'rgba(3,5,14,.9)' }[f.wetter];
+    const toenung = landToenung(f) || null;
     for (const b of baeume) {
       const z = b.pos - s, art = BAUM[b.art];
       if (z < 2 || z > 350 || !fertig(art.bild)) continue;
@@ -432,6 +432,26 @@
       });
     }
   }
+  // Grünstreifen neben der Straße (ChatGPT, Original Material/Bilder/gruenstreifen.webp, nahtlos gemacht, außen weich
+  // ausgeblendet): 3,5 m breit, links am Bild 0,5 m Schotter zur Straße hin. Links der Straße gespiegelt. Bäume und
+  // Schilder stehen darauf statt in der Luft (Nutzer, 19.10.2026). Nicht im Wohngebiet (dort ist Rasen im Straßenbild).
+  const GRUEN = bild('gruenstreifen.webp'), GRUEN_BREITE = 3.5, GRUEN_LAENGE = 1055 / (400 / 3.5);
+  const gruenFassung = {};
+  function gruenBild(toenung, gespiegelt) {
+    const k = toenung + gespiegelt;
+    if (gruenFassung[k]) return gruenFassung[k];
+    const c = document.createElement('canvas'); c.width = GRUEN.naturalWidth; c.height = GRUEN.naturalHeight;
+    const g = c.getContext('2d');
+    if (gespiegelt) { g.translate(c.width, 0); g.scale(-1, 1); }
+    g.drawImage(GRUEN, 0, 0);
+    if (toenung) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = toenung; g.fillRect(0, 0, c.width, c.height); }
+    return (gruenFassung[k] = c);
+  }
+  // Abtönung wie Panorama und Bäume (Regen, Nebel, Nacht)
+  function landToenung(f) {
+    if (f.wetter === 'sonne' || f.wetter === 'tag') return '';
+    return landschaftJetzt(f).toenung || { regen: 'rgba(70,78,88,.6)', nebel: 'rgba(214,219,224,.7)', nacht: 'rgba(3,5,14,.9)' }[f.wetter];
+  }
   const umgebungsBilder = {};
   function umgebungLaden(f) {
     const u = f && UMGEBUNGEN[f.umgebung];
@@ -444,15 +464,22 @@
   }
   function strasseJetzt(f) {
     const u = UMGEBUNGEN[f.umgebung], b = u && umgebungsBilder[u.strasse];
-    return b && fertig(b) ? { bild: b, links: u.links, rechts: u.rechts, laenge: u.laenge, pfosten: u.pfosten }
-      : { bild: STRASSE, links: STRASSE_LINKS, rechts: STRASSE_RECHTS, laenge: STRASSE_LAENGE, pfosten: true };
+    return b && fertig(b) ? { bild: b, links: u.links, rechts: u.rechts, laenge: u.laenge, pfosten: u.pfosten, gruen: u.gruen !== false }
+      : { bild: STRASSE, links: STRASSE_LINKS, rechts: STRASSE_RECHTS, laenge: STRASSE_LAENGE, pfosten: true, gruen: !u || u.gruen !== false };
   }
 
   function strasseBild(g, f) {
     const st = strasseJetzt(f), iw = st.bild.naturalWidth, ih = st.bild.naturalHeight;
+    const gruen = st.gruen && fertig(GRUEN), tn = landToenung(f);
+    const gR = gruen && gruenBild(tn, false), gL = gruen && gruenBild(tn, true), gw = gruen && GRUEN.naturalWidth, gh = gruen && GRUEN.naturalHeight;
     const zeile = (z, y, h) => {
       const anteil = ((s + z) / st.laenge) % 1;
       const xl = xZ(st.links, z), xr = xZ(st.rechts, z);
+      if (gruen) {   // Grünstreifen zuerst, die Straße überdeckt die Kante
+        const gy = (1 - ((s + z) / GRUEN_LAENGE) % 1) * (gh - 1), b = GRUEN_BREITE * mProM(z), ue = 0.1 * mProM(z);
+        g.drawImage(gR, 0, gy, gw, 1, xr - ue, y, b, h);
+        g.drawImage(gL, 0, gy, gw, 1, xl + ue - b, y, b, h);
+      }
       g.drawImage(st.bild, 0, (1 - anteil) * (ih - 1), iw, 1, xl, y, xr - xl, h);
     };
     const zK = kuppenAbstand();
