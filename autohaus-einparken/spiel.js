@@ -8,7 +8,7 @@
   const W = 600, HW = 900;   // Spielwelt in Einheiten (hochkant); im Querformat wird sie gedreht
   const AL = 92, AB = 40;    // Länge und Breite eines Autos (Verhältnis wie beim gemalten Auto)
   const TEMPO = 230;         // Einheiten pro Sekunde
-  const VERSUCHE = 7;   // je Lücke (Nutzer 18.10.2026: 7 statt 6); jeder Versuch ohne Punkte (Unfall oder nicht ganz drin) zählt, danach ist Schluss – die bisherigen Punkte bleiben
+  const VERSUCHE = 3;   // je Lücke (Nutzer 19.10.2026: 3; vorher 7); jeder Versuch ohne Punkte (Unfall oder nicht ganz drin) zählt, danach ist Schluss – die bisherigen Punkte bleiben
   // Aktuelle Opel-Lackfarben (Corsa, Mokka, Grandland laut carwow.de, Okt. 2026); Farbwerte nachempfunden, nicht offiziell.
   // Kein Gelb: das eigene Auto hat die Kundenfarbe.
   const FARBEN = [
@@ -577,7 +577,7 @@
     texte: {
       titel: 'Einparken',
       untertitel: 'Passt du in jede Lücke?',
-      anleitung: 'Zieh mit dem Finger eine Linie vom Auto in die markierte Parklücke – das Auto fährt sie nach. Je gerader und mittiger, desto mehr Punkte. Pro Lücke sieben Versuche.',
+      anleitung: 'Zieh mit dem Finger eine Linie vom Auto in die markierte Parklücke – das Auto fährt sie nach. Je gerader und mittiger, desto mehr Punkte. Pro Lücke drei Versuche.',
       ende: 'Einparken auf Knopfdruck? Unsere Neuwagen helfen mit Kamera und Parkassistent.',
     },
     // Aufnahmen (Pixabay Content License); 'crash' ersetzt den erzeugten Ton gleichen Namens
