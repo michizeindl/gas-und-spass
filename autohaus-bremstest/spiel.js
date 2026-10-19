@@ -13,22 +13,32 @@
     { kmh: 30, wetter: 'tag', gefahr: 'ball' },
     { kmh: 50, wetter: 'tag', gefahr: 'hase' },   // Hase statt Reh (Nutzer, 18.10.2026), das Reh bleibt in Fahrt 5
     { kmh: 50, wetter: 'regen', gefahr: 'auto' },
-    { kmh: 70, wetter: 'tag', gefahr: 'stau' },
+    { kmh: 70, wetter: 'tag', gefahr: 'stau', steigung: 8, kuppe: 12.5 },   // Nutzer 19.10.2026: bergauf, Stauende 12,5 m hinter der Kuppe
     { kmh: 70, wetter: 'nebel', gefahr: 'reh' },
     { kmh: 100, wetter: 'nacht', gefahr: 'stau' },
-    { kmh: 100, wetter: 'sonne', gefahr: 'ladung' },   // Fahrt 7 (Nutzer, 18.10.2026): blendende Sonne, Sonnenblende, LKW verliert Ladung
+    { kmh: 100, wetter: 'sonne', gefahr: 'ladung', steigung: -8 },   // Fahrt 7 (Nutzer, 18.10.2026): blendende Sonne, Sonnenblende, LKW verliert Ladung
   ];
   const WETTER = { tag: 'trocken', regen: 'Regen', nebel: 'Nebel', nacht: 'Nacht', sonne: 'Sonne' };
   const NASS = 1.5;          // Bremsweg bei Nässe 1,5-mal so lang
   const FAIR = 0.9;          // bei 0,9 s Reaktionszeit reicht der Platz gerade noch
   const AUTOFARBEN = ['#b9bdc0', '#2f63c6', '#f2f3f1', '#5f6366', '#e2622f', '#1d1f22'];   // Opel-Lackfarben
 
-  // Fahrschul-Faustformel: Bremsweg bei Gefahrenbremsung = (km/h / 10)² / 2, bei Nässe länger
-  const bremsweg = f => (f.kmh / 10) ** 2 / 2 * (f.wetter === 'regen' ? NASS : 1);
+  // Fahrschul-Faustformel: Bremsweg bei Gefahrenbremsung = (km/h / 10)² / 2, bei Nässe länger.
+  // Steigung (+) bzw. Gefälle (−) in Prozent: Verzögerung a = a0·cos θ + g·sin θ – bergauf hilft die Schwerkraft, bergab bremst sie dagegen
+  const bremsweg = f => {
+    const s0 = (f.kmh / 10) ** 2 / 2 * (f.wetter === 'regen' ? NASS : 1);
+    if (!f.steigung) return s0;
+    const ms = f.kmh / 3.6, a0 = ms * ms / (2 * s0), th = Math.atan(f.steigung / 100);
+    return ms * ms / (2 * (a0 * Math.cos(th) + 9.81 * Math.sin(th)));
+  };
+  // Kuppe: so weit vor dem Stau, dass die Dächer (1,5 m) genau dann über den Kamm ragen, wenn die Gefahr beginnt
+  const KUPPE_DACH = 1.5;
+  const kuppenSicht = f => { const q = f.steigung / 100, d = f.kuppe; return AUGE / (2 * q - KUPPE_DACH / d) + d; };
 
   // ---------- Zustand ----------
   let schilder = [];
   let haseX = -6;
+  let kuppe = null;   // Weltposition der Kuppe (nur Fahrt mit kuppe)
   let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, lkw, holzT, ergebnisse, zuFrueh, zuFruehGesamt, wackeln, rehX, ballX, zahlen, blink;
   let B = 0, H = 0;
 
@@ -59,6 +69,9 @@
     // LKW mit offener Ladetür (nur bei „ladung“): fährt so weit vorne, dass das herunterfallende Holz fair liegt
     lkw = f.gefahr === 'ladung' ? { pos: v0 * FAIR + bremsweg(f) + 2.5, v: v0 } : null;
     holzT = 0;
+    // Kuppe: der Stau steht von Anfang an fest (hinter dem Kamm verborgen) und taucht auf, wenn die Gefahr beginnt
+    kuppe = null;
+    if (f.kuppe) { ziel = v0 * tEreignis + kuppenSicht(f); kuppe = ziel - f.kuppe; }
   }
 
   // Abstand zur Gefahr in Metern (vor der eigenen Stoßstange)
@@ -163,13 +176,14 @@
     const laeuft = phase !== 'aus';
     regen.stellen(laeuft && f.wetter === 'regen' ? 1 : 0);
     nacht.stellen(laeuft && f.wetter === 'nacht' ? 1 : 0);
-    blinker.stellen(laeuft && f.gefahr === 'stau' && ziel != null ? 1 : 0);
+    blinker.stellen(laeuft && f.gefahr === 'stau' && ziel != null && (kuppe == null || phase !== 'fahren') ? 1 : 0);
     R_.anzeige(`Fahrt ${nr + 1}/${FAHRTEN.length} – ${f.kmh} km/h – ${WETTER[f.wetter]}`, ergebnisse.length ? 'Ø ' + sek(schnittZeit()) : '');
   }
 
   function gefahrBeginnt(f) {
     phase = 'gefahr'; gefahrT = 0;
     if (auto) { auto.bremst = true; return; }
+    if (kuppe != null) return;   // Stau steht schon hinter der Kuppe
     ziel = s + v0 * FAIR + bremsweg(f) + 1.5;
     if (lkw) ziel = lkw.pos - 1;   // Holz fällt direkt hinter dem LKW auf die Straße
   }
@@ -212,7 +226,22 @@
   // Perspektive: Kamera 1,2 m über der Straße; y(z) = Horizont + P/z
   const AUGE = 1.2, NAH = 4.5;   // vorderster sichtbarer Punkt der Straße (Motorhaube verdeckt den Rest)
   let hz = 0, unten = 0, mitte = 0, PERS = 1;
-  const yZ = z => hz + PERS / z;
+  // Höhe der Fahrbahn in der Entfernung z gegenüber der eigenen Fahrbahnebene (Kuppe: hinter dem Kamm fällt sie ab)
+  function kuppenAbstand() { return kuppe == null ? Infinity : kuppe - s; }
+  function hoehe(z) {
+    const zK = kuppenAbstand();
+    if (!isFinite(zK) || zK < 2 || z <= zK) return 0;
+    const q = FAHRTEN[nr].steigung / 100, k = Math.min(1, (zK - 2) / 8);   // kurz vor dem Kamm wird das Profil flach
+    return -2 * q * k * (z - zK);
+  }
+  const yZ = z => hz + PERS / z * (1 - hoehe(z) / AUGE);
+  let hzLand = 0;   // Horizont der Landschaft (bergauf tiefer, bergab höher als der Fluchtpunkt der Straße)
+  // Dinge hinter der Kuppe nur oberhalb des Kamms zeichnen
+  function hinterKuppe(g, z, zeichnen) {
+    const zK = kuppenAbstand();
+    if (!isFinite(zK) || zK < 2 || z <= zK) return zeichnen();
+    g.save(); g.beginPath(); g.rect(0, 0, B, yZ(zK)); g.clip(); zeichnen(); g.restore();
+  }
   const mProM = z => PERS / (AUGE * z);   // Bildpunkte pro Meter in der Entfernung z
   const xZ = (x, z) => mitte + x * mProM(z);
 
@@ -224,6 +253,7 @@
     unten = ck.armaturen + 6;                          // Straße endet knapp unter dem Armaturenbrett
     hz = Math.max(60, ck.y + (unten - ck.y) * 0.3);    // Horizont im oberen Drittel der Windschutzscheibe
     PERS = (unten - hz) * NAH;
+    hzLand = hz + (f.steigung || 0) / 100 * PERS / AUGE * 1.1;
 
     rueckstrahler = [];
     himmel(g, f);
@@ -278,8 +308,8 @@
     if (fertig(LANDSCHAFT)) {
       // Panorama so groß, dass es die Breite füllt und Augenhöhe auf dem Horizont liegt
       const iw = LANDSCHAFT.naturalWidth, ih = LANDSCHAFT.naturalHeight;
-      const m = Math.max(B / iw, hz / LANDSCHAFT_HORIZONT, (H - hz) / (ih - LANDSCHAFT_HORIZONT));
-      g.drawImage(LANDSCHAFT, (B - iw * m) / 2, hz - LANDSCHAFT_HORIZONT * m, iw * m, ih * m);
+      const m = Math.max(B / iw, hzLand / LANDSCHAFT_HORIZONT, (H - hzLand) / (ih - LANDSCHAFT_HORIZONT));
+      g.drawImage(LANDSCHAFT, (B - iw * m) / 2, hzLand - LANDSCHAFT_HORIZONT * m, iw * m, ih * m);
       const toenung = { regen: 'rgba(70,78,88,.6)', nebel: 'rgba(214,219,224,.7)', nacht: 'rgba(3,5,14,.9)' }[f.wetter];
       if (toenung) { g.fillStyle = toenung; g.fillRect(0, 0, B, H); }
       return;
@@ -309,13 +339,26 @@
 
   function strasseBild(g, f) {
     const iw = STRASSE.naturalWidth, ih = STRASSE.naturalHeight;
-    // Zeile für Zeile: jede Bildschirmzeile zeigt die Straße in ihrer Entfernung z
-    for (let y = Math.floor(hz) + 1; y < unten + 2; y++) {
-      const z = PERS / (y + 0.5 - hz);
-      if (z > 400) continue;
+    const zeile = (z, y, h) => {
       const anteil = ((s + z) / STRASSE_LAENGE) % 1;
       const xl = xZ(STRASSE_LINKS, z), xr = xZ(STRASSE_RECHTS, z);
-      g.drawImage(STRASSE, 0, (1 - anteil) * (ih - 1), iw, 1, xl, y, xr - xl, 1.2);
+      g.drawImage(STRASSE, 0, (1 - anteil) * (ih - 1), iw, 1, xl, y, xr - xl, h);
+    };
+    const zK = kuppenAbstand();
+    // Zeile für Zeile: jede Bildschirmzeile zeigt die Straße in ihrer Entfernung z (bei einer Kuppe nur bis zum Kamm)
+    for (let y = Math.floor(hz) + 1; y < unten + 2; y++) {
+      const z = PERS / (y + 0.5 - hz);
+      if (z > 400 || (zK >= 2 && z > zK)) continue;
+      zeile(z, y, 1.2);
+    }
+    if (isFinite(zK) && zK >= 2) {
+      // hinter dem Kamm: von nah nach fern, nur was über die bereits gezeichnete Straße hinausragt
+      let yMin = zK > NAH ? yZ(zK) : unten + 2;
+      for (let z = Math.max(zK, NAH); z < 400; z += Math.max(0.25, z * 0.01)) {
+        const y = yZ(z);
+        if (y < yMin - 0.3) { zeile(z, y, yMin - y + 0.6); yMin = y; }
+      }
+      return;   // kein Dunst: die Ferne liegt hinter der Kuppe
     }
     // In der Ferne verschwimmt der Asphalt (verhindert Flimmern der Striche)
     const zNah = 70, yNah = yZ(zNah);
@@ -348,9 +391,9 @@
       for (let k = 16; k >= 0; k--) {
         const z = k * 25 - lp;
         if (z < NAH) continue;
-        for (const x of [2.6, -6.1]) leitpfosten(g, xZ(x, z), yZ(z), mProM(z), nacht, x < 0);
+        hinterKuppe(g, z, () => { for (const x of [2.6, -6.1]) leitpfosten(g, xZ(x, z), yZ(z), mProM(z), nacht, x < 0); });
       }
-      for (const sch of [...schilder].sort((a, b) => b.pos - a.pos)) schild(g, sch, sch.pos - s);
+      for (const sch of [...schilder].sort((a, b) => b.pos - a.pos)) hinterKuppe(g, sch.pos - s, () => schild(g, sch, sch.pos - s));
       return;
     }
     // Fahrbahn: rechter Rand +2,1 m, Mittellinie −1,75 m, linker Rand −5,6 m (Kamera in der Mitte der rechten Spur)
@@ -430,6 +473,10 @@
 
   // ---------- Gefahren (gemalte Bilder, gezeichneter Ersatz solange sie laden) ----------
   function gefahrZeichnen(g, f) {
+    if (kuppe != null && ziel != null) return hinterKuppe(g, ziel - s, () => gefahrBilder(g, f));
+    gefahrBilder(g, f);
+  }
+  function gefahrBilder(g, f) {
     if (auto && fertig(BILD.wohnmobil)) {
       const an = auto.bremst && fertig(BILD.wohnmobilAn);
       return stauAuto(g, an ? BILD.wohnmobilAn : BILD.wohnmobil, 0, Math.max(1.5, auto.pos - s), 2.35, STAU_LICHT.wohnmobil, auto.bremst, false);
@@ -468,7 +515,7 @@
         const breite = STAU_BREITE[l] || (l === 'rot' ? 1.9 : 2.05);
         stauAuto(g, BILD[b], x, z + dz, breite, STAU_LICHT[l]);
       }
-      warndreieck(g, 1.2, z - 25);
+      warndreieck(g, 1.2, kuppe != null ? z - 6 : z - 25);
     }
     else if (f.gefahr === 'stau') {
       autoHinten(g, -3.5, z + 6, AUTOFARBEN[(nr + 2) % 6], true, true);
@@ -478,9 +525,9 @@
   }
 
   // Lage der Rückleuchten (Anteile von Breite/Höhe, am Bild abgemessen) und der dritten Bremsleuchte oben
-  const STAU_LICHT = { rot: { seiten: [[0.17, 0.38], [0.84, 0.38]], oben: [0.5, 0.16] }, blau: { seiten: [[0.17, 0.42], [0.83, 0.41]], oben: [0.5, 0.11] },
-    transporter: { seiten: [[0.1, 0.554], [0.897, 0.553]], oben: [0.498, 0.021] }, kombi: { seiten: [[0.14, 0.408], [0.875, 0.409]], oben: [0.526, 0.1] },
-    suv: { seiten: [[0.14, 0.378], [0.852, 0.378]], oben: [0.498, 0.099] }, lkw: { seiten: [[0.167, 0.762], [0.834, 0.763]], oben: [0.505, 0.017] },
+  const STAU_LICHT = { rot: { seiten: [[0.17, 0.38], [0.84, 0.38]], oben: [0.5, 0.16] }, blau: { seiten: [[0.138, 0.447], [0.866, 0.447]], oben: [0.5, 0.11] },
+    transporter: { seiten: [[0.1, 0.554], [0.897, 0.553]], oben: [0.498, 0.021] }, kombi: { seiten: [[0.111, 0.456], [0.888, 0.457]], oben: [0.501, 0.11] },
+    suv: { seiten: [[0.13, 0.43], [0.865, 0.43]], oben: [0.487, 0.085] }, lkw: { seiten: [[0.167, 0.762], [0.834, 0.763]], oben: [0.505, 0.017] },
     wohnmobil: { seiten: [[0.131, 0.757], [0.863, 0.758]], oben: [0.453, 0.099] },
     nachtBus: { seiten: [[0.097, 0.67], [0.907, 0.672]], oben: [0.505, 0.111] }, nachtPickup: { seiten: [[0.081, 0.442], [0.916, 0.44]], oben: [0.499, 0.031] },
     nachtKleinwagen: { seiten: [[0.131, 0.427], [0.875, 0.425]], oben: [0.507, 0.078] }, nachtSattelzug: { seiten: [[0.123, 0.805], [0.883, 0.805]], oben: [0.504, 0.024] } };
@@ -640,7 +687,7 @@
   function sonne(g) {
     const t = performance.now() / 1000;
     const flackern = 0.82 + 0.1 * Math.sin(t * 7.3) + 0.08 * Math.sin(t * 13.1 + 1) + (Math.sin(t * 1.7) > 0.93 ? 0.35 : 0);
-    const sx = B * 0.68, sy = hz - Math.max(22, (unten - hz) * 0.14), r = Math.max(B, H) * 0.7;
+    const sx = B * 0.68, sy = hzLand - Math.max(22, (unten - hz) * 0.14), r = Math.max(B, H) * 0.7;
     // ganze Scheibe ausgebleicht
     g.fillStyle = `rgba(255,244,214,${0.22 * flackern})`;
     g.fillRect(0, 0, B, unten);
@@ -856,7 +903,7 @@
     const posten = [
       ['Reaktionszeit', e.zuFrueh ? sek(e.reaktion) + ' + ' + sek(ZU_FRUEH * e.zuFrueh) : sek(e.reaktion)],
       ['Reaktionsweg', meter(e.reaktionsweg)],
-      ['Bremsweg', meter(e.bremsweg)],
+      [FAHRTEN[e.fahrt].steigung > 0 ? 'Bremsweg (bergauf)' : FAHRTEN[e.fahrt].steigung < 0 ? 'Bremsweg (bergab)' : 'Bremsweg', meter(e.bremsweg)],
       ['Anhalteweg', meter(e.anhalteweg)],
       [e.unfall ? 'Platz' : 'Noch Platz', e.unfall ? '–' : meter(e.platz)],
     ];
