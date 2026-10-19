@@ -427,7 +427,6 @@
         g.save();
         if (f.wetter === 'nebel') g.globalAlpha = Math.max(0, Math.min(1, 1.25 - z / 50));   // im Nebel verschwinden ferne Bäume
         g.translate(x, y); if (b.spiegel) g.scale(-1, 1);
-        g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(0, 0, w * 0.18, w * 0.04, 0, 0, Math.PI * 2); g.fill();   // Schatten am Fuß
         g.drawImage(baumBild(art, toenung), -w / 2, -h, w, h);
         g.restore();
       });
@@ -607,9 +606,7 @@
     if (z < NAH || z > 300 || !sch.bild || !fertig(sch.bild)) return;
     const b = sch.km ? werbeBild(sch.km) || sch.bild : sch.bild, bw = b.naturalWidth || b.width, bh = b.naturalHeight || b.height;
     const m = mProM(z), h = (sch.hoehe || 3.0) * m, w = h * bw / bh, x = xZ(sch.x || 3.4, z), y = yZ(z);
-    // Schatten am Fuß der Pfosten (Werbeschild: zwei Pfosten), damit das Schild sichtbar auf dem Boden steht
-    g.fillStyle = 'rgba(0,0,0,.35)';
-    for (const dx of sch.km ? [-0.276, 0.273] : [0]) { g.beginPath(); g.ellipse(x + dx * w, y, 0.35 * m, 0.08 * m, 0, 0, Math.PI * 2); g.fill(); }
+    // ohne Schatten am Fuß (Nutzer, 19.10.2026: sah hässlich aus)
     g.drawImage(b, x - w / 2, y - h, w, h);
   }
 
