@@ -10,14 +10,15 @@
   // ---------- Fahrten ----------
   // gefahr: reh | hase | ball | auto (bremst vor einem) | stau (Stauende mit Warnblinker) | ladung (LKW vor einem verliert Holz)
   const FAHRTEN = [
-    { kmh: 30, wetter: 'tag', gefahr: 'ball' },
-    { kmh: 50, wetter: 'tag', gefahr: 'hase' },   // Hase statt Reh (Nutzer, 18.10.2026), das Reh bleibt in Fahrt 5
-    { kmh: 50, wetter: 'regen', gefahr: 'auto' },
-    { kmh: 70, wetter: 'tag', gefahr: 'stau', steigung: 8, kuppe: 12.5 },   // Nutzer 19.10.2026: bergauf, Stauende 12,5 m hinter der Kuppe
-    { kmh: 70, wetter: 'nebel', gefahr: 'reh' },
+    { kmh: 30, wetter: 'tag', gefahr: 'ball', umgebung: 'wohngebiet', geraeusch: 'kinder' },   // eigene Umgebung (Nutzer, 19.10.2026)
+    { kmh: 50, wetter: 'tag', gefahr: 'hase', geraeusch: 'voegel' },   // Hase statt Reh (Nutzer, 18.10.2026), das Reh bleibt in Fahrt 5
+    { kmh: 50, wetter: 'regen', gefahr: 'auto', umgebung: 'obstwiese' },
+    { kmh: 70, wetter: 'tag', gefahr: 'stau', steigung: 8, kuppe: 12.5, geraeusch: 'voegel' },   // Nutzer 19.10.2026: bergauf, Stauende 12,5 m hinter der Kuppe
+    { kmh: 70, wetter: 'nebel', gefahr: 'reh', umgebung: 'wald', geraeusch: 'wald' },
     { kmh: 100, wetter: 'nacht', gefahr: 'stau' },
-    { kmh: 100, wetter: 'sonne', gefahr: 'ladung', steigung: -8 },   // Fahrt 7 (Nutzer, 18.10.2026): blendende Sonne, Sonnenblende, LKW verliert Ladung
+    { kmh: 100, wetter: 'sonne', gefahr: 'ladung', steigung: -12, umgebung: 'tal', geraeusch: 'wald' },   // Fahrt 7 (Nutzer, 18.10.2026): 12 % Gefälle (19.10.2026), blendende Sonne, Sonnenblende, LKW verliert Ladung
   ];
+  // geraeusch: Hintergrund draußen (voegel | wald | kinder), leise und gedämpft wie durch die geschlossene Scheibe (Nutzer, 19.10.2026)
   const WETTER = { tag: 'trocken', regen: 'Regen', nebel: 'Nebel', nacht: 'Nacht', sonne: 'Sonne' };
   const NASS = 1.5;          // Bremsweg bei Nässe 1,5-mal so lang
   const FAIR = 0.9;          // bei 0,9 s Reaktionszeit reicht der Platz gerade noch
@@ -36,7 +37,7 @@
   const kuppenSicht = f => { const q = f.steigung / 100, d = f.kuppe; return AUGE / (2 * q - KUPPE_DACH / d) + d; };
 
   // ---------- Zustand ----------
-  let schilder = [];
+  let schilder = [], baeume = [];
   let haseX = -6;
   let kuppe = null;   // Weltposition der Kuppe (nur Fahrt mit kuppe)
   let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, lkw, holzT, ergebnisse, zuFrueh, zuFruehGesamt, wackeln, rehX, ballX, zahlen, blink;
@@ -53,6 +54,7 @@
     v0 = f.kmh / 3.6; v = v0; s = 0;
     a = v0 * v0 / (2 * bremsweg(f));
     phase = 'fahren'; phaseT = 0;
+    umgebungLaden(f); umgebungLaden(FAHRTEN[nr + 1]);   // diese und die nächste Umgebung im Hintergrund laden
     tEreignis = 2.6 + Math.random() * 3.4;             // Gefahr kommt nach 2,6 bis 6 Sekunden
     gefahrT = 0; reaktion = null; ziel = null; wackeln = 0; zahlen = null;
     rehX = 4.5; ballX = 3.2; haseX = -6;
@@ -62,6 +64,9 @@
     const fruehesteGefahr = v0 * (2.6 + FAIR) + bremsweg(f) + 1.5;
     schilder = [{ bild: SCHILD['tempo-' + f.kmh], pos: Math.max(20, fruehesteGefahr * 0.4) }];
     if (warnung) schilder.push({ bild: SCHILD[warnung], pos: fruehesteGefahr * 0.8 });
+    // Steigung bzw. Gefälle: Schild ganz vorne, noch vor dem Tempo-Schild (Fahrt 4: 8 %, Fahrt 7: 12 %)
+    if (f.steigung) schilder.push({ bild: SCHILD[f.steigung > 0 ? 'steigung' : 'gefaelle'], pos: Math.max(14, fruehesteGefahr * 0.2) });
+    baeume = baeumePflanzen(f);
     // Werbeschild vom Autohaus links am Rand (4,5 m breit), weit vorne, damit es auch auf dem Handy lange ganz im Bild ist
     schilder.push({ bild: WERBUNG, pos: Math.max(70, fruehesteGefahr * 0.7), x: -7.6, hoehe: 3.2 });
     // vorausfahrendes Auto (nur bei „auto“): fährt im Abstand vor einem her
@@ -158,7 +163,7 @@
       else v = Math.max(0, v - a * dt);
       s += v * dt;
       if (auto) { auto.v = Math.max(0, auto.v - a * dt); auto.pos += auto.v * dt; }
-      if (lkw) { lkw.v += 3 * dt; lkw.pos += lkw.v * dt; holzT += dt; }   // der LKW fährt weiter, das Holz bleibt liegen
+      if (lkw) { lkw.v += 3 * dt; lkw.pos += lkw.v * dt; if (holzT < 0.35 && holzT + dt >= 0.35) R_.ton('holz'); holzT += dt; }   // der LKW fährt weiter, das Holz bleibt liegen
       if (f.gefahr === 'reh') rehX = Math.max(0, rehX - dt * 9);
       if (f.gefahr === 'hase') haseX = Math.min(0, haseX + dt * 10);   // kommt von links
       if (f.gefahr === 'ball') ballX -= dt * 4.5;
@@ -176,12 +181,18 @@
     const laeuft = phase !== 'aus';
     regen.stellen(laeuft && f.wetter === 'regen' ? 1 : 0);
     nacht.stellen(laeuft && f.wetter === 'nacht' ? 1 : 0);
+    for (const [name, d] of Object.entries(draussen)) d.stellen(laeuft && f.geraeusch === name ? 1 : 0);
+    // Scheibenwischer: bei jedem Wischen (Anfang des Takts, wie im Bild) einmal das Geräusch
+    const wt = (performance.now() / 1000) % WISCH.periode;
+    if (laeuft && f.wetter === 'regen' && wt < wischVorher) R_.ton('wischer');
+    wischVorher = wt;
     blinker.stellen(laeuft && f.gefahr === 'stau' && ziel != null && (kuppe == null || phase !== 'fahren') ? 1 : 0);
     R_.anzeige(`Fahrt ${nr + 1}/${FAHRTEN.length} – ${f.kmh} km/h – ${WETTER[f.wetter]}`, ergebnisse.length ? 'Ø ' + sek(schnittZeit()) : '');
   }
 
   function gefahrBeginnt(f) {
     phase = 'gefahr'; gefahrT = 0;
+    if (f.gefahr === 'ball') R_.ton('ball');
     if (auto) { auto.bremst = true; return; }
     if (kuppe != null) return;   // Stau steht schon hinter der Kuppe
     ziel = s + v0 * FAIR + bremsweg(f) + 1.5;
@@ -235,7 +246,7 @@
     return -2 * q * k * (z - zK);
   }
   const yZ = z => hz + PERS / z * (1 - hoehe(z) / AUGE);
-  let hzLand = 0;   // Horizont der Landschaft (bergauf tiefer, bergab höher als der Fluchtpunkt der Straße)
+  let hzLand = 0, scheibeOben = 0;   // Horizont der Landschaft (bergauf tiefer, bergab höher als der Fluchtpunkt der Straße)
   // Dinge hinter der Kuppe nur oberhalb des Kamms zeichnen
   function hinterKuppe(g, z, zeichnen) {
     const zK = kuppenAbstand();
@@ -253,6 +264,7 @@
     unten = ck.armaturen + 6;                          // Straße endet knapp unter dem Armaturenbrett
     hz = Math.max(60, ck.y + (unten - ck.y) * 0.3);    // Horizont im oberen Drittel der Windschutzscheibe
     PERS = (unten - hz) * NAH;
+    scheibeOben = ck.y;
     hzLand = hz + (f.steigung || 0) / 100 * PERS / AUGE * 1.1;
 
     rueckstrahler = [];
@@ -305,12 +317,14 @@
   }
 
   function himmel(g, f) {
-    if (fertig(LANDSCHAFT)) {
+    const land = landschaftJetzt(f);
+    if (fertig(land.bild)) {
       // Panorama so groß, dass es die Breite füllt und Augenhöhe auf dem Horizont liegt
-      const iw = LANDSCHAFT.naturalWidth, ih = LANDSCHAFT.naturalHeight;
-      const m = Math.max(B / iw, hzLand / LANDSCHAFT_HORIZONT, (H - hzLand) / (ih - LANDSCHAFT_HORIZONT));
-      g.drawImage(LANDSCHAFT, (B - iw * m) / 2, hzLand - LANDSCHAFT_HORIZONT * m, iw * m, ih * m);
-      const toenung = { regen: 'rgba(70,78,88,.6)', nebel: 'rgba(214,219,224,.7)', nacht: 'rgba(3,5,14,.9)' }[f.wetter];
+      const L = land.bild, iw = L.naturalWidth, ih = L.naturalHeight, hor = land.horizont;
+      // nur so groß, dass es die sichtbare Scheibe füllt (oben Dachhimmel, unten Armaturenbrett) – sonst ist es unnötig stark vergrößert
+      const m = Math.max(B / iw, (hzLand - Math.max(0, scheibeOben)) / hor, (unten - hzLand) / (ih - hor));
+      g.drawImage(L, (B - iw * m) / 2, hzLand - hor * m, iw * m, ih * m);
+      const toenung = land.toenung || { regen: 'rgba(70,78,88,.6)', nebel: 'rgba(214,219,224,.7)', nacht: 'rgba(3,5,14,.9)' }[f.wetter];
       if (toenung) { g.fillStyle = toenung; g.fillRect(0, 0, B, H); }
       return;
     }
@@ -336,13 +350,106 @@
   // also 110,7 Bildpunkte pro Meter quer. Längs gestreckt auf 24 m pro Bild = zwei Strich-Abstände à 12 m.
   const STRASSE = bild('strasse.webp');
   const STRASSE_LINKS = -1.75 - 511.5 / 110.7, STRASSE_RECHTS = -1.75 + 512.5 / 110.7, STRASSE_LAENGE = 24;
+  // Eigene Umgebungen je Fahrt (Nutzer, 19.10.2026): Panorama + Straße. Geladen wird erst für die aktuelle und die nächste Fahrt;
+  // solange ein Bild fehlt, bleibt es bei der Landstraße.
+  // Wohngebiet: Panorama 1536 × 512, Augenhöhe Zeile 318 (Original Material/Bilder/panorama-wohngebiet.webp);
+  // Straße 1024 × 1536 (Original Material/Bilder/strasse-wohngebiet.webp): Asphalt zwischen den Bordsteinen Spalte 122–905 = 6 m
+  // (130,5 Bildpunkte pro Meter), Kamera in der Mitte der rechten Hälfte (Straßenmitte 1,5 m links), keine Leitpfosten.
+  const UMGEBUNGEN = {
+    wohngebiet: { landschaft: 'landschaft-wohngebiet.webp', horizont: 318, strasse: 'strasse-wohngebiet.webp',
+      links: -1.5 - 513.5 / 130.5, rechts: -1.5 + 510.5 / 130.5, laenge: 1536 / 130.5, pfosten: false },
+    // Streuobstwiese mit Apfelbäumen bei Regen (ganzes Bild 1536 × 1024, Augenhöhe Zeile 700, Original Material/Bilder/panorama-obstwiese.webp);
+    // das Bild ist schon trüb – deshalb nur leicht abgetönt; Straße bleibt die Landstraße
+    obstwiese: { landschaft: 'landschaft-obstwiese.webp', horizont: 700, toenung: 'rgba(70,78,88,.22)' },
+    // Waldrand mit Lichtung im Morgennebel (1536 × 1024, Augenhöhe Zeile 660, Original Material/Bilder/panorama-waldrand.webp);
+    // schon neblig – deshalb schwächere Nebel-Abtönung; Waldstraße folgt
+    // Waldstraße (Original Material/Bilder/strasse-wald.webp, zugeschnitten auf Zeile 100–1159 = genau zwei Strich-Abstände, kachelbar):
+    // Mittellinie Spalte 511, rechte Randlinie 840 → Spur 3 m = 109,7 Bildpunkte pro Meter, Kamera in der Spurmitte (Spalte 675,5);
+    // längs wie die Landstraße auf 24 m pro Bild gestreckt (zwei Strich-Abstände à 12 m)
+    wald: { landschaft: 'landschaft-waldrand.webp', horizont: 660, toenung: 'rgba(214,219,224,.45)',
+      nebel: [0.86, 0.8], strasse: 'strasse-wald.webp', links: -675.5 / 109.7, rechts: (1024 - 675.5) / 109.7, laenge: 24, pfosten: true },
+    // Bergstraße mit Blick ins Tal bei tief stehender Sonne (1536 × 1024, Original Material/Bilder/panorama-bergstrasse.webp):
+    // Augenhöhe an der Talsohle vor den Bergen (Zeile 430) – darunter liegt das Tal, in das die Straße bergab führt; Waldstraße
+    tal: { landschaft: 'landschaft-tal.webp', horizont: 430,
+      strasse: 'strasse-wald.webp', links: -675.5 / 109.7, rechts: (1024 - 675.5) / 109.7, laenge: 24, pfosten: true },
+  };
+  // Bäume am Straßenrand (ChatGPT, Original Material/Bilder/baeume-4.webp, freigestellt): Höhe in Metern.
+  // Je Umgebung: welche Arten, Abstand von–bis (m) und seitlicher Abstand zum Fahrbahnrand (m). Nutzer, 19.10.2026
+  const BAUM = {
+    linde: { bild: bild('baum-linde.webp'), hoehe: 14 }, birke: { bild: bild('baum-birke.webp'), hoehe: 12 },
+    fichte: { bild: bild('baum-fichte.webp'), hoehe: 17 }, apfel: { bild: bild('baum-apfel.webp'), hoehe: 6 },
+  };
+  const BAEUME = {
+    landstrasse: { arten: ['linde', 'linde', 'birke'], abstand: [40, 90], rand: [5, 12] },
+    wohngebiet: { arten: ['linde', 'apfel', 'apfel'], abstand: [30, 60], rand: [2.5, 5] },
+    obstwiese: { arten: ['apfel'], abstand: [14, 26], rand: [4, 10] },
+    wald: { arten: ['fichte', 'fichte', 'fichte', 'birke'], abstand: [8, 18], rand: [3, 9] },
+    tal: { arten: ['fichte', 'fichte', 'birke'], abstand: [14, 30], rand: [3, 9] },
+  };
+  function baeumePflanzen(f) {
+    const art = BAEUME[f.umgebung] || BAEUME.landstrasse, liste = [], st = strasseJetzt(f);
+    for (const seite of [1, -1]) {
+      for (let pos = 8 + Math.random() * art.abstand[0]; pos < 800; pos += art.abstand[0] + Math.random() * (art.abstand[1] - art.abstand[0])) {
+        const rand = art.rand[0] + Math.random() * (art.rand[1] - art.rand[0]);
+        liste.push({ pos, x: seite > 0 ? st.rechts + rand : st.links - rand, art: art.arten[Math.floor(Math.random() * art.arten.length)],
+          groesse: 0.8 + Math.random() * 0.4, spiegel: Math.random() < 0.5 });
+      }
+    }
+    return liste.sort((a, b) => b.pos - a.pos);   // von hinten nach vorne zeichnen
+  }
+  // Abgetönte Fassung eines Baums (wie das Panorama: Regen, Nebel, Nacht), einmal berechnet und gemerkt
+  const getoent = {};
+  function baumBild(b, toenung) {
+    if (!toenung) return b.bild;
+    const k = b.bild.src + toenung;
+    if (getoent[k]) return getoent[k];
+    const c = document.createElement('canvas'); c.width = b.bild.naturalWidth; c.height = b.bild.naturalHeight;
+    const g = c.getContext('2d');
+    g.drawImage(b.bild, 0, 0);
+    g.globalCompositeOperation = 'source-atop'; g.fillStyle = toenung; g.fillRect(0, 0, c.width, c.height);
+    return (getoent[k] = c);
+  }
+  function baeumeZeichnen(g, f) {
+    const land = landschaftJetzt(f);
+    const toenung = f.wetter === 'sonne' || f.wetter === 'tag' ? null
+      : land.toenung || { regen: 'rgba(70,78,88,.6)', nebel: 'rgba(214,219,224,.7)', nacht: 'rgba(3,5,14,.9)' }[f.wetter];
+    for (const b of baeume) {
+      const z = b.pos - s, art = BAUM[b.art];
+      if (z < 2 || z > 350 || !fertig(art.bild)) continue;
+      const m = mProM(z), h = art.hoehe * b.groesse * m, w = h * art.bild.naturalWidth / art.bild.naturalHeight;
+      if (w < 2) continue;
+      const x = xZ(b.x, z), y = yZ(z);
+      hinterKuppe(g, z, () => {
+        g.save();
+        if (f.wetter === 'nebel') g.globalAlpha = Math.max(0, Math.min(1, 1.25 - z / 50));   // im Nebel verschwinden ferne Bäume
+        g.translate(x, y); if (b.spiegel) g.scale(-1, 1);
+        g.drawImage(baumBild(art, toenung), -w / 2, -h, w, h);
+        g.restore();
+      });
+    }
+  }
+  const umgebungsBilder = {};
+  function umgebungLaden(f) {
+    const u = f && UMGEBUNGEN[f.umgebung];
+    if (!u) return;
+    for (const datei of [u.landschaft, u.strasse]) if (datei && !umgebungsBilder[datei]) umgebungsBilder[datei] = bild(datei);
+  }
+  function landschaftJetzt(f) {
+    const u = UMGEBUNGEN[f.umgebung], b = u && umgebungsBilder[u.landschaft];
+    return b && fertig(b) ? { bild: b, horizont: u.horizont, toenung: u.toenung } : { bild: LANDSCHAFT, horizont: LANDSCHAFT_HORIZONT };
+  }
+  function strasseJetzt(f) {
+    const u = UMGEBUNGEN[f.umgebung], b = u && umgebungsBilder[u.strasse];
+    return b && fertig(b) ? { bild: b, links: u.links, rechts: u.rechts, laenge: u.laenge, pfosten: u.pfosten }
+      : { bild: STRASSE, links: STRASSE_LINKS, rechts: STRASSE_RECHTS, laenge: STRASSE_LAENGE, pfosten: true };
+  }
 
   function strasseBild(g, f) {
-    const iw = STRASSE.naturalWidth, ih = STRASSE.naturalHeight;
+    const st = strasseJetzt(f), iw = st.bild.naturalWidth, ih = st.bild.naturalHeight;
     const zeile = (z, y, h) => {
-      const anteil = ((s + z) / STRASSE_LAENGE) % 1;
-      const xl = xZ(STRASSE_LINKS, z), xr = xZ(STRASSE_RECHTS, z);
-      g.drawImage(STRASSE, 0, (1 - anteil) * (ih - 1), iw, 1, xl, y, xr - xl, h);
+      const anteil = ((s + z) / st.laenge) % 1;
+      const xl = xZ(st.links, z), xr = xZ(st.rechts, z);
+      g.drawImage(st.bild, 0, (1 - anteil) * (ih - 1), iw, 1, xl, y, xr - xl, h);
     };
     const zK = kuppenAbstand();
     // Zeile für Zeile: jede Bildschirmzeile zeigt die Straße in ihrer Entfernung z (bei einer Kuppe nur bis zum Kamm)
@@ -387,8 +494,9 @@
     const nass = f.wetter === 'regen', nacht = f.wetter === 'nacht';
     if (fertig(STRASSE)) {
       strasseBild(g, f);
+      baeumeZeichnen(g, f);
       const lp = s % 25;
-      for (let k = 16; k >= 0; k--) {
+      for (let k = strasseJetzt(f).pfosten ? 16 : -1; k >= 0; k--) {   // im Wohngebiet keine Leitpfosten
         const z = k * 25 - lp;
         if (z < NAH) continue;
         hinterKuppe(g, z, () => { for (const x of [2.6, -6.1]) leitpfosten(g, xZ(x, z), yZ(z), mProM(z), nacht, x < 0); });
@@ -446,7 +554,7 @@
 
   // Verkehrsschilder (gemalt, auf Pfosten): 3 m hoch, Pfosten-Fuß in der Bildmitte, 3,4 m rechts der Kamera
   const SCHILD = {};
-  for (const n of ['tempo-30', 'tempo-50', 'tempo-70', 'tempo-100', 'wildwechsel', 'kinder', 'stau']) SCHILD[n] = bild('schild-' + n + '.webp');
+  for (const n of ['tempo-30', 'tempo-50', 'tempo-70', 'tempo-100', 'wildwechsel', 'kinder', 'stau', 'steigung', 'gefaelle']) SCHILD[n] = bild('schild-' + n + '.webp');
   const WERBUNG = bild('werbeschild.webp');   // leere Tafel (ChatGPT) mit Logo und „Ihr Opel-Partner – 2 km“
   function schild(g, sch, z) {
     if (z < NAH || z > 300 || !sch.bild || !fertig(sch.bild)) return;
@@ -645,12 +753,18 @@
     g.beginPath(); g.moveTo(cx, y - h); g.lineTo(cx + h * 0.58, y); g.lineTo(cx - h * 0.58, y); g.closePath(); g.stroke();
   }
 
+  // Lichter zweier Dörfer bei Nacht: [Anteil der Bildbreite, Bildpunkte unter dem Horizont, Größe 0–1]
+  const DORFLICHTER = [[0.12, 3, 0.4], [0.14, 4, 0.2], [0.155, 2.5, 0.6], [0.17, 4.5, 0.1], [0.19, 3.5, 0.3], [0.205, 5, 0.2], [0.22, 3, 0.5],
+    [0.235, 4, 0.1], [0.08, 5, 0.2], [0.27, 4, 0.3],
+    [0.68, 4, 0.3], [0.7, 2.5, 0.5], [0.715, 5, 0.1], [0.73, 3.5, 0.4], [0.75, 4.5, 0.2], [0.765, 3, 0.6], [0.78, 5, 0.1], [0.8, 4, 0.3],
+    [0.83, 3, 0.2], [0.9, 4.5, 0.4], [0.93, 3.5, 0.1]];
   // Regen, Nebel, Nacht über die Szene legen
   function wetterDarueber(g, f) {
     if (f.wetter === 'nebel') {
       // dichter Nebel in der Ferne, nach vorne klarer: Sichtweite etwa 40 m
       const v = g.createLinearGradient(0, hz - 40, 0, yZ(8));
-      v.addColorStop(0, 'rgba(225,229,233,.97)'); v.addColorStop(0.55, 'rgba(225,229,233,.9)'); v.addColorStop(1, 'rgba(225,229,233,0)');
+      const nb = (UMGEBUNGEN[f.umgebung] || {}).nebel || [0.97, 0.9];   // Umgebung kann den Nebel etwas lichten, damit man sie noch erahnt
+      v.addColorStop(0, `rgba(225,229,233,${nb[0]})`); v.addColorStop(0.55, `rgba(225,229,233,${nb[1]})`); v.addColorStop(1, 'rgba(225,229,233,0)');
       g.fillStyle = v; g.fillRect(0, 0, B, yZ(8));
     } else if (f.wetter === 'nacht') {
       // Scheinwerferkegel: vorne hell, dahinter dunkel
@@ -664,6 +778,15 @@
         v.addColorStop(0, 'rgba(255,240,215,.95)'); v.addColorStop(0.35, 'rgba(255,225,180,.45)'); v.addColorStop(1, 'rgba(255,210,150,0)');
         g.fillStyle = v; g.fillRect(x - r * 2.2, y - r * 2.2, r * 4.4, r * 4.4);
       }
+      // Dörfer in der Ferne (Nutzer, 19.10.2026): kleine warme Lichter knapp unter dem Horizont, links und rechts der Straße,
+      // ein paar flackern leicht (Fenster, Straßenlaternen)
+      const t = performance.now() / 1000, gr = Math.max(1, (unten - hz) / 140);
+      DORFLICHTER.forEach(([fx, dy, h], i) => {
+        const x = B * fx, y = hzLand + dy * gr, r = gr * (1 + h) * (i % 5 === 0 ? 0.8 + 0.2 * Math.sin(t * 3 + i) : 1);
+        const v = g.createRadialGradient(x, y, 0, x, y, r * 3);
+        v.addColorStop(0, 'rgba(255,214,140,.95)'); v.addColorStop(0.3, 'rgba(255,190,110,.45)'); v.addColorStop(1, 'rgba(255,170,90,0)');
+        g.fillStyle = v; g.fillRect(x - r * 3, y - r * 3, r * 6, r * 6);
+      });
       g.restore();
     } else if (f.wetter === 'sonne') {
       sonne(g);
@@ -919,6 +1042,8 @@
   }
 
   const motor = R_.dauerton('motor'), regen = R_.dauerton('regen'), nacht = R_.dauerton('nacht'), blinker = R_.dauerton('blinker');
+  const draussen = { voegel: R_.dauerton('voegel'), wald: R_.dauerton('wald'), kinder: R_.dauerton('kinder') };
+  let wischVorher = 0;
 
   R_.spiel({
     id: 'bremsen',   // neuer Name: Bestwerte zählen seit der Umstellung auf 1.000 Punkte neu
@@ -942,6 +1067,12 @@
       gut: { datei: 'klaenge/gut.wav', pegel: 0.4 },
       regen: { datei: 'klaenge/regen.mp3', proben: 242550, pegel: 0.35 },
       nacht: { datei: 'klaenge/nacht.mp3', proben: 242550, pegel: 0.3 },
+      voegel: { datei: 'klaenge/voegel.mp3', proben: 242550, pegel: 0.18 },
+      wald: { datei: 'klaenge/wald.mp3', proben: 242550, pegel: 0.2 },
+      kinder: { datei: 'klaenge/kinder.mp3', proben: 242550, pegel: 0.16 },
+      ball: { datei: 'klaenge/ball.mp3', proben: 11024, pegel: 0.25 },   // dumpf, wie durch die Scheibe
+      wischer: { datei: 'klaenge/wischer.mp3', proben: 22932, pegel: 0.22 },
+      holz: { datei: 'klaenge/holz.mp3', proben: 30428, pegel: 1 },   // verdichtet, damit der Aufschlag laut genug ist
       blinker: { datei: 'klaenge/blinker.mp3', proben: 43473, pegel: 0.3 },
       musik: { datei: 'klaenge/musik.mp3', proben: 606375, pegel: 0.07 },   // leise Hintergrundmusik (Pixabay, Red Skies – Late Night Ride)
       sieg: { datei: 'klaenge/sieg.mp3', proben: 71663, pegel: 0.45 },

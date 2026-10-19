@@ -14,7 +14,7 @@ window.KUNDE = {
 
   // Texte überschreiben (alle optional): titel, untertitel, anleitung, ende, endeTitel
   texte: {
-    anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sieben Fahrzeuge – je größer das Rad, desto kniffliger. Ab Runde 5 musst du dir die Reihenfolge merken. Jede falsche Mutter kostet eine Sekunde. Je schneller, desto mehr Punkte.',
+    anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sieben Fahrzeuge – je größer das Rad, desto kniffliger. Ab Runde 2 stellst du vorher das Drehmoment ein, ab Runde 5 musst du dir die Reihenfolge merken. Jede falsche Mutter kostet eine Sekunde. Je schneller, desto besser.',
     ende: 'Reifenwechsel ohne Stress? Das übernimmt gerne das Autohaus Zeindl in Malching.',
   },
 

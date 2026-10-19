@@ -13,23 +13,25 @@
   // merken = ab hier (Runde 5) sieht man die Nummern nur so viele Sekunden zu Beginn des Rads, danach aus dem Kopf;
   // schwingen = [Ausschlag im Verhältnis zum Radradius, Geschwindigkeit] – das Rad pendelt am Wagenheber (ab Runde 6).
   // (Nutzer, 18.10.2026)
+  // nm = Anzugsdrehmoment: ab Runde 2 vor dem Rad am Drehmomentschlüssel einstellen (Nutzer, 19.10.2026).
+  // Werte VORLÄUFIG (grob nach Herstellerangaben, Pkw um 110–130, Transporter mehr) – vom Autohaus bestätigen lassen.
   const RAEDER = [
     { name: 'Kleinwagen', muttern: 4, dreh: 0, groesse: 0.78, felge: 0.7, farbe: ['#f2f4f7', '#c3c9d1', '#848c96'],
       bild: 'bilder/rad-1.webp', nabe: 0.198, lochkreis: 0.31, mutter: 0.07 },
     { name: 'Kompaktwagen', muttern: 5, dreh: 0, groesse: 0.82, felge: 0.72, farbe: ['#f4f6f9', '#cdd3da', '#8d959f'],
-      bild: 'bilder/rad-2.webp', nabe: 0.185, lochkreis: 0.29, mutter: 0.066 },
+      bild: 'bilder/rad-2.webp', nabe: 0.185, lochkreis: 0.29, mutter: 0.066 , nm: 110 },
     { name: 'Kompakt-SUV', muttern: 5, dreh: 0.5, groesse: 0.87, felge: 0.69, farbe: ['#a2a8b0', '#626871', '#3b4047'],
-      bild: 'bilder/rad-3.webp', nabe: 0.15, lochkreis: 0.3, mutter: 0.058 },
+      bild: 'bilder/rad-3.webp', nabe: 0.15, lochkreis: 0.3, mutter: 0.058 , nm: 110 },
     { name: 'SUV', muttern: 5, dreh: -0.8, groesse: 0.91, felge: 0.66, farbe: ['#62666c', '#33363b', '#1c1e21'],
-      bild: 'bilder/rad-4.webp', nabe: 0.145, lochkreis: 0.29, mutter: 0.056 },
+      bild: 'bilder/rad-4.webp', nabe: 0.145, lochkreis: 0.29, mutter: 0.056 , nm: 120 },
     { name: 'Großer SUV', muttern: 6, dreh: 1.1, groesse: 0.96, felge: 0.66, farbe: ['#ffffff', '#dde1e6', '#9aa2ac'],
-      bild: 'bilder/rad-5.webp', nabe: 0.143, lochkreis: 0.29, mutter: 0.055, merken: 1 },
+      bild: 'bilder/rad-5.webp', nabe: 0.143, lochkreis: 0.29, mutter: 0.055, merken: 1 , nm: 130 },
     { name: 'Transporter', muttern: 6, dreh: 1.3, groesse: 1, felge: 0.62, tipps: 2, wechsel: 2.2, farbe: ['#e4e7eb', '#b5bcc5', '#7d8590'],
-      bild: 'bilder/rad-6.webp', nabe: 0.19, lochkreis: 0.31, mutter: 0.055, versatz: Math.PI / 6, merken: 1, schwingen: [0.06, 2.1], verzinkt: true },
+      bild: 'bilder/rad-6.webp', nabe: 0.19, lochkreis: 0.31, mutter: 0.055, versatz: Math.PI / 6, merken: 1, schwingen: [0.06, 2.1], verzinkt: true, nm: 160 },
     // Runde 7 (Nutzer, 18.10.2026): Movano – größtes Rad (225/75 R16 auf Stahlfelge), dreht schneller, wechselt öfter die Richtung
     { name: 'Großer Transporter', muttern: 6, dreh: 1.6, groesse: 1.03, felge: 0.56, tipps: 2, wechsel: 1.6, farbe: ['#c9ced4', '#9aa1a9', '#626971'],
       bild: 'bilder/rad-7.webp', nabe: 0.16, lochkreis: 0.21, mutter: 0.075, versatz: 0, verzinkt: true,   // LKW-Stahlfelge: Muttern eng um die Nabe, 4 Lüftungslöcher außen (Nutzer, 18.10.2026)
-      merken: 1, schwingen: [0.09, 2.6] },
+      merken: 1, schwingen: [0.09, 2.6], nm: 180 },
   ];
   // Eigene Fahrzeugnamen aus kunde.js (z. B. Modelle der Marke des Autohauses)
   (R_.kunde.fahrzeuge || []).forEach((n, i) => { if (RAEDER[i] && n) RAEDER[i].name = n; });
@@ -48,10 +50,12 @@
   const BEREIT = 3;     // Countdown 3 – 2 – 1, dann LOS (passend zu klaenge/start.mp3)
   // Zeit → Punkte (höchstens 1.000, wie in allen Spielen), dazwischen gleichmäßig verteilt.
   // Die Stufengrenzen 900/800/700/550 sind in allen Spielen gleich.
-  const ZU_LANGSAM = 160;   // Sekunden (mit Strafzeit): danach Spielende „Zu langsam“ mit 0 Punkten (Nutzerwunsch)
-  const PUNKTE = [[20, 1000], [26, 900], [33, 800], [42, 700], [53, 550], [92, 150], [130, 1]];   // sieben Runden (Nutzer, 18.10.2026); ab 130s nur noch 1 Punkt
+  const ZU_LANGSAM = 170;   // Sekunden (mit Strafzeit): danach Spielende „Zu langsam“ mit 0 Punkten (Nutzerwunsch)
+  // Drehmomentschlüssel: Skala zeigt 120 Nm um den Zielwert (Ziel nicht immer in der Mitte), Zeiger läuft über die Skala, Tippen stellt ein. ±10 Nm ohne Strafe, ±25 Nm +1s, sonst +3s
+  const DM = { spanne: 120, gut: 10, knapp: 25, strafeKnapp: 1, strafeDaneben: 3, zeigen: 0.7 };
+  const PUNKTE = [[30, 1000], [36, 900], [43, 800], [52, 700], [63, 550], [102, 150], [140, 1]];   // sieben Runden + Drehmoment ab Runde 2: alle Grenzen +10s (Nutzer, 19.10.2026); ab 140s nur noch 1 Punkt
 
-  let rad, muttern, naechste, zeit, strafe, radStart, radZeiten, winkel, richtung, richtungT, phase, phaseT, wackeln, schilder, ansage, startTon, zeigen, schwingT;
+  let rad, muttern, naechste, zeit, strafe, radStart, radZeiten, winkel, richtung, richtungT, phase, phaseT, wackeln, schilder, ansage, startTon, zeigen, schwingT, dmLauf, dmWert, dmErgebnis, dmVon;
   // Geometrie, wird beim Zeichnen berechnet: R = Rad, FR = Felge, LK = Lochkreis, MG = Muttergröße, NB = Nabenkappe
   let cx = 0, cy = 0, R = 100, FR = 70, LK = 43, MG = 10, NB = 25, unten = 80;
 
@@ -64,6 +68,8 @@
     radStart = { zeit, strafe };   // für die Auswertung: Zeit und Strafe je Fahrzeug
     winkel = Math.random() * Math.PI * 2;
     richtung = 1; richtungT = 0; zeigen = 0; schwingT = 0;
+    dmLauf = Math.random() * Math.PI * 2; dmWert = null; dmErgebnis = null;
+    if (RAEDER[rad].nm) dmVon = RAEDER[rad].nm - 30 - 10 * Math.floor(Math.random() * 7);   // Ziel 30–90 Nm vom linken Rand
   }
 
   function neu() {
@@ -114,7 +120,7 @@
 
     if (phase === 'bereit') {
       if (!startTon) { startTon = true; R_.ton('start'); }   // Countdown: Piep bei 3, 2, 1 und LOS
-      if (phaseT > BEREIT + 0.35) { phase = 'rad'; phaseT = 0; ansagen(); }
+      if (phaseT > BEREIT + 0.35) { radLos(); ansagen(); }
     }
     else if (phase === 'rad') {
       zeit += dt;
@@ -128,12 +134,20 @@
       winkel += r.dreh * richtung * dt;
     }
     else if (phase === 'raus' && phaseT > WECHSEL) { rad++; neuesRad(); phase = 'rein'; phaseT = 0; ansagen(); }
-    else if (phase === 'rein' && phaseT > WECHSEL) { phase = 'rad'; phaseT = 0; }
+    else if (phase === 'rein' && phaseT > WECHSEL) radLos();
+    else if (phase === 'dm') {
+      if (dmWert == null) {
+        zeit += dt;
+        // Zeiger pendelt über die Skala; je größer das Rad, desto schneller, bei den Transportern ungleichmäßig
+        const tempo = 1.5 + rad * 0.22, unruhig = r.tipps > 1 ? 1 + 0.55 * Math.sin(phaseT * 2.7) : 1;
+        dmLauf += dt * tempo * unruhig;
+      } else if (phaseT > DM.zeigen) { phase = 'rad'; phaseT = 0; }
+    }
     else if (phase === 'fertig' && phaseT > 0.5 && R_.zustand === 'spiel') {
       const t = gesamt();
       R_.ton('sieg');
       R_.ende(punkteAus(t), {
-        ueberschrift: t < 26 ? 'Formel-1-Niveau' : t < 33 ? 'Profi-Mechaniker' : t < 42 ? 'Gute Arbeit' : t < 53 ? 'Passt schon' : 'Endlich fertig',
+        ueberschrift: t < 36 ? 'Formel-1-Niveau' : t < 43 ? 'Profi-Mechaniker' : t < 52 ? 'Gute Arbeit' : t < 63 ? 'Passt schon' : 'Endlich fertig',
         zusatz: sekunden(t),
         auswertung: auswertung(false),
       });
@@ -141,6 +155,10 @@
     const nr = Math.min(rad, RAEDER.length - 1);
     R_.anzeige(`Runde ${nr + 1}/${RAEDER.length} – ${RAEDER[nr].name}`, sekunden(zeit + strafe));
   }
+
+  // Neues Rad ist da: erst den Drehmomentschlüssel einstellen (ab Runde 2), dann die Muttern
+  function radLos() { phase = RAEDER[rad].nm ? 'dm' : 'rad'; phaseT = 0; }
+  function dmZeiger() { return dmVon + DM.spanne * (0.5 - 0.5 * Math.cos(dmLauf)); }
 
   // Für das Endbild: Zeit je Fahrzeug. Balken im Verhältnis zu einer flotten Zeit für dieses Rad
   // (je Mutter und Tipp 0,45 s), damit große Räder nicht unfair wirken. Bei „Zu langsam“: aktuelles Rad rot, Rest grau.
@@ -159,6 +177,7 @@
   }
 
   function runter(x, y) {
+    if (phase === 'dm' && dmWert == null) return dmEinstellen();
     if (phase !== 'rad') return;
     // Trefferkreis großzügig, aber nie bis zur Nachbarmutter
     let beste = null, d2 = Math.min(Math.max(MG * 2, 24), LK * Math.sin(Math.PI / muttern.length) * 0.95) ** 2;
@@ -191,6 +210,73 @@
       R_.ton('fehler'); R_.vibrieren(80);
       schild('+' + STRAFE + 's', mx, my - MG * 1.3, '#ff6b6b');
     }
+  }
+
+  function dmEinstellen() {
+    const ziel = RAEDER[rad].nm;
+    dmWert = Math.round(dmZeiger()); phaseT = 0;
+    const ab = dmWert - ziel;
+    R_.ton('ratsche');
+    if (Math.abs(ab) <= DM.gut) dmErgebnis = { text: 'Perfekt eingestellt', farbe: '#7bd88f' };
+    else if (Math.abs(ab) <= DM.knapp) {
+      strafe += DM.strafeKnapp;
+      dmErgebnis = { text: 'Knapp daneben +' + DM.strafeKnapp + 's', farbe: '#ffd166' };
+    } else {
+      strafe += DM.strafeDaneben; wackeln = 0.35;
+      R_.ton('fehler'); R_.vibrieren(80);
+      dmErgebnis = { text: (ab < 0 ? 'Zu locker!' : 'Zu fest – Gewinde kaputt') + ' +' + DM.strafeDaneben + 's', farbe: '#ff6b6b' };
+    }
+  }
+
+  // Gemalter Drehmomentschlüssel (ChatGPT, Original Material/Bilder/drehmomentschluessel.webp, 1400 × 145):
+  // das helle Skalenfeld (vorher Grün) liegt bei x 375–793, y 33–84. Der Schlüssel wird groß gezeichnet, damit die Skala
+  // auf dem Handy gut zu treffen ist – Kopf und Griff dürfen dabei über den Rand ragen.
+  const SCHLUESSEL = new Image();
+  SCHLUESSEL.src = 'bilder/drehmomentschluessel.webp';
+  const SKALA = { x0: 375, x1: 793, y0: 33, y1: 84, w: 1400, h: 145 };
+
+  // Skala auf dem Schlüssel: grüner Bereich ±10 Nm, gelb ±25 Nm, Zeiger läuft hin und her
+  function zeichneDrehmoment(g, B, rMax) {
+    const ziel = RAEDER[rad].nm;
+    const W = Math.min(B * 1.6, rMax * 4.4), k = W / SKALA.w;
+    const sw = (SKALA.x1 - SKALA.x0) * k, sh = (SKALA.y1 - SKALA.y0) * k;
+    const sx = B / 2 - sw / 2, sy = cy - sh / 2;                  // Skalenfeld mittig über dem Rad
+    const wx = sx - SKALA.x0 * k, wy = sy - SKALA.y0 * k, wh = SKALA.h * k;
+    const fs = Math.max(15, Math.min(26, B * 0.05));
+    const xNm = nm => sx + sw * (nm - dmVon) / DM.spanne;
+    g.save();
+    // dunkles Band hinter Schlüssel und Text
+    const oben = wy - fs * 2, hoch = wh + fs * 4;
+    g.fillStyle = 'rgba(10,11,13,.78)'; g.fillRect(0, oben, B, hoch);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `800 ${fs}px ${SCHRIFT}`; g.fillStyle = '#fff';
+    g.fillText(`Drehmoment einstellen: ${ziel} Nm`, B / 2, oben + fs * 1.05);
+    // Schlüssel (ohne Bild: schlichte Stange)
+    if (SCHLUESSEL.complete && SCHLUESSEL.naturalWidth) g.drawImage(SCHLUESSEL, wx, wy, W, wh);
+    else { g.fillStyle = '#b9bec4'; g.fillRect(wx, sy - sh * 0.2, W, sh * 1.4); g.fillStyle = '#eeeee8'; g.fillRect(sx, sy, sw, sh); }
+    // Felder und Striche auf der Skala
+    g.save(); g.beginPath(); g.rect(sx, sy, sw, sh); g.clip();
+    g.fillStyle = 'rgba(255,193,7,.55)'; g.fillRect(xNm(ziel - DM.knapp), sy, xNm(ziel + DM.knapp) - xNm(ziel - DM.knapp), sh);
+    g.fillStyle = 'rgba(46,160,67,.9)'; g.fillRect(xNm(ziel - DM.gut), sy, xNm(ziel + DM.gut) - xNm(ziel - DM.gut), sh);
+    g.strokeStyle = '#22252a'; g.fillStyle = '#22252a'; g.lineWidth = 1;
+    g.font = `700 ${Math.max(9, sh * 0.4)}px ${SCHRIFT}`;
+    for (let nm = Math.ceil(dmVon / 10) * 10; nm <= dmVon + DM.spanne; nm += 10) {
+      const xx = xNm(nm), lang = nm % 20 === 0;
+      g.beginPath(); g.moveTo(xx, sy); g.lineTo(xx, sy + sh * (lang ? 0.35 : 0.2)); g.stroke();
+      if (lang && nm > dmVon && nm < dmVon + DM.spanne) g.fillText(String(nm), xx, sy + sh * 0.68);
+    }
+    g.restore();
+    // Zeiger: Strich über die Skala, Dreieck darüber
+    const xz = xNm(dmWert != null ? dmWert : dmZeiger()), dr = Math.max(7, sh * 0.35);
+    g.fillStyle = dmErgebnis ? dmErgebnis.farbe : '#e53935';
+    g.strokeStyle = '#000'; g.lineWidth = 1.5;
+    g.fillRect(xz - 1.5, sy - 2, 3, sh + 4);
+    g.beginPath(); g.moveTo(xz, sy - 1); g.lineTo(xz - dr * 0.6, sy - dr * 1.3); g.lineTo(xz + dr * 0.6, sy - dr * 1.3); g.closePath(); g.fill(); g.stroke();
+    // Hinweis bzw. Ergebnis
+    g.font = `800 ${fs * 0.8}px ${SCHRIFT}`;
+    g.fillStyle = dmErgebnis ? dmErgebnis.farbe : 'rgba(255,255,255,.8)';
+    g.fillText(dmErgebnis ? `${dmErgebnis.text}  (${dmWert} Nm)` : 'Tippen, wenn der Zeiger im grünen Feld ist', B / 2, oben + hoch - fs * 1.0);
+    g.restore();
   }
 
   // ---------- Zeichnen ----------
@@ -226,6 +312,7 @@
     g.restore();
 
     zeichneFortschritt(g, B, H);
+    if (zustand === 'spiel' && phase === 'dm') zeichneDrehmoment(g, B, rMax);
 
     schilder.forEach(s => {
       g.save();
@@ -333,6 +420,7 @@
 
   // Wie deutlich die Nummern zu sehen sind (0–1): ab Runde 5 nur am Anfang des Rads und kurz nach einem Fehler
   function zahlenSicht(r) {
+    if (r.merken && (phase === 'dm' || phase === 'rein' || phase === 'bereit')) return 0;   // vor dem Rad nichts verraten
     if (!r.merken || phase !== 'rad') return 1;
     return Math.max(Math.min(1, (r.merken + 0.3 - phaseT) / 0.3), Math.min(1, zeigen / 0.2));
   }
@@ -535,7 +623,7 @@
     texte: {
       titel: 'Reifenwechsel',
       untertitel: 'Wie schnell bist du?',
-      anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sieben Fahrzeuge vom Kleinwagen bis zum großen Transporter – je größer das Rad, desto kniffliger. Ab Runde 5 musst du dir die Reihenfolge merken. Jede falsche Mutter kostet eine Sekunde. Je schneller, desto mehr Punkte.',
+      anleitung: 'Zieh die Radmuttern über Kreuz fest: Tippe sie in der Reihenfolge 1, 2, 3… an. Sieben Fahrzeuge vom Kleinwagen bis zum großen Transporter – je größer das Rad, desto kniffliger. Ab Runde 2 stellst du vorher das Drehmoment ein, ab Runde 5 musst du dir die Reihenfolge merken. Jede falsche Mutter kostet eine Sekunde. Je schneller, desto besser.',
       ende: 'Reifenwechsel ohne Stress? Das übernimmt unsere Werkstatt für dich.',
     },
     // Aufnahmen: Pixabay Content License; Werkstatt-Geräusch von Freesound (CC BY 3.0, Namensnennung in quellen)
