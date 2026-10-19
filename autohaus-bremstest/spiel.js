@@ -40,7 +40,7 @@
   let schilder = [], baeume = [];
   let haseX = -6;
   let kuppe = null;   // Weltposition der Kuppe (nur Fahrt mit kuppe)
-  let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, lkw, holzT, hoelzer = [], staub = [], ergebnisse, zuFrueh, zuFruehGesamt, wackeln, rehX, ballX, zahlen, blink;
+  let nr, phase, phaseT, s, v, v0, a, tEreignis, gefahrT, reaktion, ziel, auto, lkw, holzT, hoelzer = [], staub = [], splitter = [], ergebnisse, zuFrueh, zuFruehGesamt, wackeln, rehX, ballX, zahlen, blink;
   let B = 0, H = 0;
 
   function neu() {
@@ -75,7 +75,7 @@
     // LKW mit offener Ladetür (nur bei „ladung“): fährt so weit vorne, dass das herunterfallende Holz fair liegt
     // (+8 m: die einzelnen Kanthölzer fallen hinter ihm herunter und rutschen bis vor die faire Stelle)
     lkw = f.gefahr === 'ladung' ? { pos: v0 * FAIR + bremsweg(f) + 8, v: v0 } : null;
-    holzT = 0; hoelzer = []; staub = [];
+    holzT = 0; hoelzer = []; staub = []; splitter = [];
     // Kuppe: der Stau steht von Anfang an fest (hinter dem Kamm verborgen) und taucht auf, wenn die Gefahr beginnt
     kuppe = null; stauSichtbar = false;
     if (f.kuppe) { ziel = v0 * tEreignis + kuppenSicht(f); kuppe = ziel - f.kuppe; }
@@ -870,6 +870,10 @@
           R_.ton(['holz', 'holz-2', 'holz-3'][Math.floor(Math.random() * 3)]);
           if (h === hoelzer[0] || h === hoelzer[2]) R_.ton('rutschen');   // Schrammen über den Asphalt (nicht bei jedem, sonst zu laut)
           staubWolke(h.x, h.L, 4);
+          // Holzsplitter fliegen weg (Nutzer, 19.10.2026): kleine helle Späne, fallen mit Schwerkraft und bleiben kurz liegen
+          for (let k = 0; k < 8; k++) splitter.push({ x: h.x + (Math.random() - 0.5) * h.laenge * 0.8, z: h.L, y: 0.1,
+            vx: (Math.random() - 0.5) * 6, vz: (Math.random() - 0.5) * 4, vy: 1.5 + Math.random() * 2.5,
+            w: Math.random() * P, dw: (Math.random() - 0.5) * 30, l: 0.12 + Math.random() * 0.22, t: 0, liegt: 0 });
         }
         const tb = tt - HOLZ_FALL;
         h.hoch = tb < HOLZ_HUEPF ? 0.2 * Math.sin(tb / HOLZ_HUEPF * P) : 0;   // kurzer Hüpfer
@@ -881,6 +885,12 @@
     }
     for (const p of staub) p.t += dt;
     staub = staub.filter(p => p.t < p.dauer);
+    for (const p of splitter) {
+      p.t += dt;
+      if (p.y > 0 || p.vy > 0) { p.vy -= 9.81 * dt; p.x += p.vx * dt; p.z += p.vz * dt; p.y += p.vy * dt; p.w += p.dw * dt; }
+      if (p.y <= 0 && p.vy <= 0) { p.y = 0; p.vy = 0; p.liegt += dt; }
+    }
+    splitter = splitter.filter(p => p.liegt < 2.5);
   }
   function hoelzerZeichnen(g, ohneStaub) {
     const sichtbar = hoelzer.filter(h => h.z != null && h.z - s > 1.2).sort((a, b) => b.z - a.z);
@@ -892,6 +902,16 @@
       g.translate(xZ(h.x, z), yZ(z) - h.hoch * m - hh * 0.4);
       g.rotate(h.winkel);
       g.drawImage(bildH, -w / 2, -hh / 2, w, hh);
+      g.restore();
+    }
+    for (const p of splitter) {   // Späne: kurze helle Striche, liegend langsam ausgeblendet
+      const z = p.z - s;
+      if (z < 1.2) continue;
+      const m = mProM(z), x = xZ(p.x, z), y = yZ(z) - p.y * m, l = p.l * m / 2;
+      if (l < 0.6) continue;
+      g.save(); g.globalAlpha *= Math.max(0, 1 - Math.max(0, p.liegt - 1.5));
+      g.strokeStyle = '#e3c394'; g.lineWidth = Math.max(1, 0.035 * m); g.lineCap = 'round';
+      g.beginPath(); g.moveTo(x - Math.cos(p.w) * l, y - Math.sin(p.w) * l * 0.6); g.lineTo(x + Math.cos(p.w) * l, y + Math.sin(p.w) * l * 0.6); g.stroke();
       g.restore();
     }
     if (ohneStaub) return;

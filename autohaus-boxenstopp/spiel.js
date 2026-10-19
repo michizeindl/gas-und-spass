@@ -14,7 +14,7 @@
   // schwingen = [Ausschlag im Verhältnis zum Radradius, Geschwindigkeit] – das Rad pendelt am Wagenheber (ab Runde 6).
   // (Nutzer, 18.10.2026)
   // nm = Anzugsdrehmoment: ab Runde 2 vor dem Rad am Drehmomentschlüssel einstellen (Nutzer, 19.10.2026).
-  // Werte VORLÄUFIG (grob nach Herstellerangaben, Pkw um 110–130, Transporter mehr) – vom Autohaus bestätigen lassen.
+  // Werte vom Nutzer bestätigt (19.10.2026).
   const RAEDER = [
     { name: 'Kleinwagen', muttern: 4, dreh: 0, groesse: 0.78, felge: 0.7, farbe: ['#f2f4f7', '#c3c9d1', '#848c96'],
       bild: 'bilder/rad-1.webp', nabe: 0.198, lochkreis: 0.31, mutter: 0.07 },
