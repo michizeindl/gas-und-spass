@@ -383,11 +383,11 @@
   // Bäume stehen auf dem Grünstreifen (rand = Abstand zum Rand des Straßenbilds in m); im Wohngebiet ohne Grünstreifen
   // ganz außen am Straßenbild – weiter draußen zeigt nur das Panorama die ferne Landschaft, dort würden sie schweben (Nutzer, 19.10.2026)
   const BAEUME = {
-    landstrasse: { arten: ['linde', 'linde', 'birke'], abstand: [40, 90], rand: [0.8, 2.4] },
+    landstrasse: { arten: ['linde', 'linde', 'birke'], abstand: [40, 90], rand: [1.2, 3.4] },
     wohngebiet: { arten: ['linde', 'apfel', 'apfel'], abstand: [30, 60], rand: [-0.15, 0.1] },
-    obstwiese: { arten: ['apfel'], abstand: [14, 26], rand: [0.8, 2.4] },
-    wald: { arten: ['fichte', 'fichte', 'fichte', 'birke'], abstand: [8, 18], rand: [0.8, 2.4] },
-    tal: { arten: ['fichte', 'fichte', 'birke'], abstand: [14, 30], rand: [0.8, 2.4] },
+    obstwiese: { arten: ['apfel'], abstand: [14, 26], rand: [1.2, 3.4] },
+    wald: { arten: ['fichte', 'fichte', 'fichte', 'birke'], abstand: [8, 18], rand: [1.2, 3.4] },
+    tal: { arten: ['fichte', 'fichte', 'birke'], abstand: [14, 30], rand: [1.2, 3.4] },
   };
   function baeumePflanzen(f) {
     const art = BAEUME[f.umgebung] || BAEUME.landstrasse, liste = [], st = strasseJetzt(f);
@@ -395,7 +395,8 @@
       for (let pos = 8 + Math.random() * art.abstand[0]; pos < 800; pos += art.abstand[0] + Math.random() * (art.abstand[1] - art.abstand[0])) {
         // kein Baum am Schild: auf derselben Seite Abstand halten (vor dem breiten Werbeschild 30 m frei, sonst verdeckt ein naher Baum die Tafel) – Nutzer, 19.10.2026
         if (schilder.some(sch => Math.sign(sch.x || 3.4) === seite && (sch.km ? pos > sch.pos - 30 && pos < sch.pos + 10 : Math.abs(sch.pos - pos) < 6))) continue;
-        const rand = art.rand[0] + Math.random() * (art.rand[1] - art.rand[0]);
+        // rechts weiter weg von der Straße (Nutzer, 19.10.2026): +1,5 m
+        const rand = art.rand[0] + Math.random() * (art.rand[1] - art.rand[0]) + (seite > 0 ? 1.5 : 0);
         liste.push({ pos, x: seite > 0 ? st.rechts + rand : st.links - rand, art: art.arten[Math.floor(Math.random() * art.arten.length)],
           groesse: 0.8 + Math.random() * 0.4, spiegel: Math.random() < 0.5 });
       }
@@ -433,9 +434,10 @@
     }
   }
   // Grünstreifen neben der Straße (ChatGPT, Original Material/Bilder/gruenstreifen.webp, nahtlos gemacht, außen weich
-  // ausgeblendet): 3,5 m breit, links am Bild 0,5 m Schotter zur Straße hin. Links der Straße gespiegelt. Bäume und
+  // ausgeblendet, außen um eine gespiegelte Graskopie verbreitert): 6,3 m breit, die äußeren 30 % weich ausgeblendet,
+  // links am Bild 0,5 m Schotter zur Straße hin. Links der Straße gespiegelt. Bäume und
   // Schilder stehen darauf statt in der Luft (Nutzer, 19.10.2026). Nicht im Wohngebiet (dort ist Rasen im Straßenbild).
-  const GRUEN = bild('gruenstreifen.webp'), GRUEN_BREITE = 3.5, GRUEN_LAENGE = 1055 / (400 / 3.5);
+  const GRUEN = bild('gruenstreifen.webp'), GRUEN_BREITE = 6.27, GRUEN_LAENGE = 1179 / (800 / 6.27);
   const gruenFassung = {};
   function gruenBild(toenung, gespiegelt) {
     const k = toenung + gespiegelt;
@@ -604,8 +606,11 @@
   function schild(g, sch, z) {
     if (z < NAH || z > 300 || !sch.bild || !fertig(sch.bild)) return;
     const b = sch.km ? werbeBild(sch.km) || sch.bild : sch.bild, bw = b.naturalWidth || b.width, bh = b.naturalHeight || b.height;
-    const m = mProM(z), h = (sch.hoehe || 3.0) * m, w = h * bw / bh;
-    g.drawImage(b, xZ(sch.x || 3.4, z) - w / 2, yZ(z) - h, w, h);
+    const m = mProM(z), h = (sch.hoehe || 3.0) * m, w = h * bw / bh, x = xZ(sch.x || 3.4, z), y = yZ(z);
+    // Schatten am Fuß der Pfosten (Werbeschild: zwei Pfosten), damit das Schild sichtbar auf dem Boden steht
+    g.fillStyle = 'rgba(0,0,0,.35)';
+    for (const dx of sch.km ? [-0.276, 0.273] : [0]) { g.beginPath(); g.ellipse(x + dx * w, y, 0.35 * m, 0.08 * m, 0, 0, Math.PI * 2); g.fill(); }
+    g.drawImage(b, x - w / 2, y - h, w, h);
   }
 
   function leitpfosten(g, x, y, m, nacht, links) {
@@ -814,9 +819,10 @@
       g.fillStyle = v; g.fillRect(0, 0, B, yZ(8));
     } else if (f.wetter === 'nacht') {
       // Scheinwerferkegel: vorne hell, dahinter dunkel
-      const d = g.createLinearGradient(0, hz, 0, unten);
-      d.addColorStop(0, 'rgba(0,0,8,.92)'); d.addColorStop(0.35, 'rgba(0,0,8,.55)'); d.addColorStop(1, 'rgba(0,0,8,.05)');
-      g.fillStyle = d; g.fillRect(0, hz - 30, B, unten - hz + 30);
+      // oben weich einblenden (vorher harte Kante 30 px über dem Horizont, fiel bei Baumkronen auf)
+      const d = g.createLinearGradient(0, hz - 60, 0, unten), k = 60 / (unten - hz + 60);
+      d.addColorStop(0, 'rgba(0,0,8,0)'); d.addColorStop(k, 'rgba(0,0,8,.92)'); d.addColorStop(k + (1 - k) * 0.35, 'rgba(0,0,8,.55)'); d.addColorStop(1, 'rgba(0,0,8,.05)');
+      g.fillStyle = d; g.fillRect(0, hz - 60, B, unten - hz + 60);
       // Rückstrahler der Leitpfosten leuchten im Scheinwerferlicht
       g.save(); g.globalCompositeOperation = 'lighter';
       for (const [x, y, r] of rueckstrahler) {
