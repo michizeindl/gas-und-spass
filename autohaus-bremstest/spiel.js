@@ -68,7 +68,8 @@
     if (f.steigung) schilder.push({ bild: SCHILD[f.steigung > 0 ? 'steigung' : 'gefaelle'], pos: Math.max(14, fruehesteGefahr * 0.2) });
     baeume = baeumePflanzen(f);
     // Werbeschild vom Autohaus links am Rand (4,5 m breit), weit vorne, damit es auch auf dem Handy lange ganz im Bild ist
-    schilder.push({ bild: WERBUNG, pos: Math.max(70, fruehesteGefahr * 0.7), x: -7.6, hoehe: 3.2 });
+    // Entfernung zum Autohaus wird jede Fahrt kürzer: Fahrt 1 noch 8 km, Fahrt 7 noch 2 km (Nutzer, 19.10.2026)
+    schilder.push({ bild: WERBUNG, km: 8 - nr, pos: Math.max(70, fruehesteGefahr * 0.7), x: -7.6, hoehe: 3.2 });
     // vorausfahrendes Auto (nur bei „auto“): fährt im Abstand vor einem her
     auto = f.gefahr === 'auto' ? { pos: v0 * FAIR + 2, v: v0, bremst: false, farbe: AUTOFARBEN[nr % AUTOFARBEN.length] } : null;
     // LKW mit offener Ladetür (nur bei „ladung“): fährt so weit vorne, dass das herunterfallende Holz fair liegt
@@ -379,12 +380,14 @@
     linde: { bild: bild('baum-linde.webp'), hoehe: 14 }, birke: { bild: bild('baum-birke.webp'), hoehe: 12 },
     fichte: { bild: bild('baum-fichte.webp'), hoehe: 17 }, apfel: { bild: bild('baum-apfel.webp'), hoehe: 6 },
   };
+  // Bäume stehen direkt auf dem Bankett am Rand des Straßenbilds (Allee) – weiter draußen zeigt nur das Panorama
+  // die ferne Landschaft, dort würden sie schweben (Nutzer, 19.10.2026). rand = Abstand innerhalb des Straßenbilds (m, negativ = nach innen)
   const BAEUME = {
-    landstrasse: { arten: ['linde', 'linde', 'birke'], abstand: [40, 90], rand: [5, 12] },
-    wohngebiet: { arten: ['linde', 'apfel', 'apfel'], abstand: [30, 60], rand: [2.5, 5] },
-    obstwiese: { arten: ['apfel'], abstand: [14, 26], rand: [4, 10] },
-    wald: { arten: ['fichte', 'fichte', 'fichte', 'birke'], abstand: [8, 18], rand: [3, 9] },
-    tal: { arten: ['fichte', 'fichte', 'birke'], abstand: [14, 30], rand: [3, 9] },
+    landstrasse: { arten: ['linde', 'linde', 'birke'], abstand: [40, 90], rand: [-0.5, -0.2] },
+    wohngebiet: { arten: ['linde', 'apfel', 'apfel'], abstand: [30, 60], rand: [-0.5, -0.2] },
+    obstwiese: { arten: ['apfel'], abstand: [14, 26], rand: [-0.5, -0.2] },
+    wald: { arten: ['fichte', 'fichte', 'fichte', 'birke'], abstand: [8, 18], rand: [-0.4, -0.2] },
+    tal: { arten: ['fichte', 'fichte', 'birke'], abstand: [14, 30], rand: [-0.4, -0.2] },
   };
   function baeumePflanzen(f) {
     const art = BAEUME[f.umgebung] || BAEUME.landstrasse, liste = [], st = strasseJetzt(f);
@@ -423,6 +426,7 @@
         g.save();
         if (f.wetter === 'nebel') g.globalAlpha = Math.max(0, Math.min(1, 1.25 - z / 50));   // im Nebel verschwinden ferne Bäume
         g.translate(x, y); if (b.spiegel) g.scale(-1, 1);
+        g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(0, 0, w * 0.18, w * 0.04, 0, 0, Math.PI * 2); g.fill();   // Schatten am Fuß
         g.drawImage(baumBild(art, toenung), -w / 2, -h, w, h);
         g.restore();
       });
@@ -556,10 +560,25 @@
   const SCHILD = {};
   for (const n of ['tempo-30', 'tempo-50', 'tempo-70', 'tempo-100', 'wildwechsel', 'kinder', 'stau', 'steigung', 'gefaelle']) SCHILD[n] = bild('schild-' + n + '.webp');
   const WERBUNG = bild('werbeschild.webp');   // leere Tafel (ChatGPT) mit Logo und „Ihr Opel-Partner – 2 km“
+  // Werbeschild mit passender Entfernung: Textzeile (unter dem Logo, y 170–254 von 574) weiß übermalen und neu schreiben
+  const werbeTafeln = {};
+  function werbeBild(km) {
+    if (werbeTafeln[km]) return werbeTafeln[km];
+    if (!fertig(WERBUNG)) return null;
+    const c = document.createElement('canvas'); c.width = WERBUNG.naturalWidth; c.height = WERBUNG.naturalHeight;
+    const g = c.getContext('2d'), k = c.width / 802;
+    g.drawImage(WERBUNG, 0, 0);
+    g.fillStyle = '#fefefe'; g.fillRect(17 * k, 168 * k, 768 * k, 86 * k);
+    g.fillStyle = '#1b1b1b'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `700 ${52 * k}px "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif`;
+    g.fillText(`Ihr Opel-Partner – ${km} km`, 401 * k, 214 * k, 740 * k);
+    return (werbeTafeln[km] = c);
+  }
   function schild(g, sch, z) {
     if (z < NAH || z > 300 || !sch.bild || !fertig(sch.bild)) return;
-    const m = mProM(z), h = (sch.hoehe || 3.0) * m, w = h * sch.bild.naturalWidth / sch.bild.naturalHeight;
-    g.drawImage(sch.bild, xZ(sch.x || 3.4, z) - w / 2, yZ(z) - h, w, h);
+    const b = sch.km ? werbeBild(sch.km) || sch.bild : sch.bild, bw = b.naturalWidth || b.width, bh = b.naturalHeight || b.height;
+    const m = mProM(z), h = (sch.hoehe || 3.0) * m, w = h * bw / bh;
+    g.drawImage(b, xZ(sch.x || 3.4, z) - w / 2, yZ(z) - h, w, h);
   }
 
   function leitpfosten(g, x, y, m, nacht, links) {
