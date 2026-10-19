@@ -358,7 +358,7 @@
   // (130,5 Bildpunkte pro Meter), Kamera in der Mitte der rechten Hälfte (Straßenmitte 1,5 m links), keine Leitpfosten.
   const UMGEBUNGEN = {
     wohngebiet: { landschaft: 'landschaft-wohngebiet.webp', horizont: 318, strasse: 'strasse-wohngebiet.webp',
-      links: -1.5 - 513.5 / 130.5, rechts: -1.5 + 510.5 / 130.5, laenge: 1536 / 130.5, pfosten: false, gruen: false },
+      links: -1.5 - 513.5 / 130.5, rechts: -1.5 + 510.5 / 130.5, laenge: 1536 / 130.5, pfosten: false, gruen: 'rasen' },
     // Streuobstwiese mit Apfelbäumen bei Regen (ganzes Bild 1536 × 1024, Augenhöhe Zeile 700, Original Material/Bilder/panorama-obstwiese.webp);
     // das Bild ist schon trüb – deshalb nur leicht abgetönt; Straße bleibt die Landstraße
     obstwiese: { landschaft: 'landschaft-obstwiese.webp', horizont: 700, toenung: 'rgba(70,78,88,.22)' },
@@ -384,7 +384,7 @@
   // ganz außen am Straßenbild – weiter draußen zeigt nur das Panorama die ferne Landschaft, dort würden sie schweben (Nutzer, 19.10.2026)
   const BAEUME = {
     landstrasse: { arten: ['linde', 'linde', 'birke'], abstand: [40, 90], rand: [1.2, 3.4] },
-    wohngebiet: { arten: ['linde', 'apfel', 'apfel'], abstand: [30, 60], rand: [-0.15, 0.1] },
+    wohngebiet: { arten: ['linde', 'apfel', 'apfel'], abstand: [30, 60], rand: [0.8, 2.6] },
     obstwiese: { arten: ['apfel'], abstand: [14, 26], rand: [1.2, 3.4] },
     wald: { arten: ['fichte', 'fichte', 'fichte', 'birke'], abstand: [8, 18], rand: [1.2, 3.4] },
     tal: { arten: ['fichte', 'fichte', 'birke'], abstand: [14, 30], rand: [1.2, 3.4] },
@@ -435,16 +435,20 @@
   // Grünstreifen neben der Straße (ChatGPT, Original Material/Bilder/gruenstreifen.webp, nahtlos gemacht, außen weich
   // ausgeblendet, außen um eine gespiegelte Graskopie verbreitert): 6,3 m breit, die äußeren 30 % weich ausgeblendet,
   // links am Bild 0,5 m Schotter zur Straße hin. Links der Straße gespiegelt. Bäume und
-  // Schilder stehen darauf statt in der Luft (Nutzer, 19.10.2026). Nicht im Wohngebiet (dort ist Rasen im Straßenbild).
-  const GRUEN = bild('gruenstreifen.webp'), GRUEN_BREITE = 6.27, GRUEN_LAENGE = 1179 / (800 / 6.27);
+  // Schilder stehen darauf statt in der Luft (Nutzer, 19.10.2026). Im Wohngebiet ein Rasenstreifen ohne Schotter
+  // (rasenstreifen.webp, nur der Grasteil, 5,5 m) hinter dem Gehweg – sonst schwebten dort Bäume und Schilder.
+  const STREIFEN = {
+    gras: { bild: bild('gruenstreifen.webp'), breite: 6.27, laenge: 1179 / (800 / 6.27) },
+    rasen: { bild: bild('rasenstreifen.webp'), breite: 5.53, laenge: 1336 / (800 / 5.53) },
+  };
   const gruenFassung = {};
-  function gruenBild(toenung, gespiegelt) {
-    const k = toenung + gespiegelt;
+  function gruenBild(art, toenung, gespiegelt) {
+    const k = art + toenung + gespiegelt, quelle = STREIFEN[art].bild;
     if (gruenFassung[k]) return gruenFassung[k];
-    const c = document.createElement('canvas'); c.width = GRUEN.naturalWidth; c.height = GRUEN.naturalHeight;
+    const c = document.createElement('canvas'); c.width = quelle.naturalWidth; c.height = quelle.naturalHeight;
     const g = c.getContext('2d');
     if (gespiegelt) { g.translate(c.width, 0); g.scale(-1, 1); }
-    g.drawImage(GRUEN, 0, 0);
+    g.drawImage(quelle, 0, 0);
     if (toenung) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = toenung; g.fillRect(0, 0, c.width, c.height); }
     return (gruenFassung[k] = c);
   }
@@ -465,19 +469,19 @@
   }
   function strasseJetzt(f) {
     const u = UMGEBUNGEN[f.umgebung], b = u && umgebungsBilder[u.strasse];
-    return b && fertig(b) ? { bild: b, links: u.links, rechts: u.rechts, laenge: u.laenge, pfosten: u.pfosten, gruen: u.gruen !== false }
-      : { bild: STRASSE, links: STRASSE_LINKS, rechts: STRASSE_RECHTS, laenge: STRASSE_LAENGE, pfosten: true, gruen: !u || u.gruen !== false };
+    return b && fertig(b) ? { bild: b, links: u.links, rechts: u.rechts, laenge: u.laenge, pfosten: u.pfosten, gruen: u.gruen || 'gras' }
+      : { bild: STRASSE, links: STRASSE_LINKS, rechts: STRASSE_RECHTS, laenge: STRASSE_LAENGE, pfosten: true, gruen: 'gras' };
   }
 
   function strasseBild(g, f) {
     const st = strasseJetzt(f), iw = st.bild.naturalWidth, ih = st.bild.naturalHeight;
-    const gruen = st.gruen && fertig(GRUEN), tn = landToenung(f);
-    const gR = gruen && gruenBild(tn, false), gL = gruen && gruenBild(tn, true), gw = gruen && GRUEN.naturalWidth, gh = gruen && GRUEN.naturalHeight;
+    const sf = STREIFEN[st.gruen], gruen = sf && fertig(sf.bild), tn = landToenung(f);
+    const gR = gruen && gruenBild(st.gruen, tn, false), gL = gruen && gruenBild(st.gruen, tn, true), gw = gruen && sf.bild.naturalWidth, gh = gruen && sf.bild.naturalHeight;
     const zeile = (z, y, h) => {
       const anteil = ((s + z) / st.laenge) % 1;
       const xl = xZ(st.links, z), xr = xZ(st.rechts, z);
       if (gruen) {   // Grünstreifen zuerst, die Straße überdeckt die Kante
-        const gy = (1 - ((s + z) / GRUEN_LAENGE) % 1) * (gh - 1), b = GRUEN_BREITE * mProM(z), ue = 0.1 * mProM(z);
+        const gy = (1 - ((s + z) / sf.laenge) % 1) * (gh - 1), b = sf.breite * mProM(z), ue = 0.1 * mProM(z);
         g.drawImage(gR, 0, gy, gw, 1, xr - ue, y, b, h);
         g.drawImage(gL, 0, gy, gw, 1, xl + ue - b, y, b, h);
       }
