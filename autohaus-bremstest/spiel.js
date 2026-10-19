@@ -450,7 +450,16 @@
     if (gespiegelt) { g.translate(c.width, 0); g.scale(-1, 1); }
     g.drawImage(quelle, 0, 0);
     if (toenung) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = toenung; g.fillRect(0, 0, c.width, c.height); }
-    return (gruenFassung[k] = c);
+    // Verkleinerte Stufen (je halb so groß) für die Ferne: dort fielen sonst viele Bildzeilen auf eine Bildschirmzeile
+    // und das Gras flimmerte/zeigte Streifen (Nutzer, 19.10.2026: „hässliche Effekte auf dem Rasen“)
+    const stufen = [c];
+    while (stufen.length < 7) {
+      const v = stufen[stufen.length - 1], n = document.createElement('canvas');
+      n.width = Math.max(8, v.width >> 1); n.height = Math.max(8, v.height >> 1);
+      const ng = n.getContext('2d'); ng.imageSmoothingQuality = 'high'; ng.drawImage(v, 0, 0, n.width, n.height);
+      stufen.push(n);
+    }
+    return (gruenFassung[k] = stufen);
   }
   // Abtönung wie Panorama und Bäume (Regen, Nebel, Nacht)
   function landToenung(f) {
@@ -481,9 +490,13 @@
       const anteil = ((s + z) / st.laenge) % 1;
       const xl = xZ(st.links, z), xr = xZ(st.rechts, z);
       if (gruen) {   // Grünstreifen zuerst, die Straße überdeckt die Kante
-        const gy = (1 - ((s + z) / sf.laenge) % 1) * (gh - 1), b = sf.breite * mProM(z), ue = 0.1 * mProM(z);
-        g.drawImage(gR, 0, gy, gw, 1, xr - ue, y, b, h);
-        g.drawImage(gL, 0, gy, gw, 1, xl + ue - b, y, b, h);
+        const b = sf.breite * mProM(z), ue = 0.1 * mProM(z);
+        // passende Stufe: wie viele Bildzeilen (längs) bzw. Bildspalten (quer) auf einen Bildschirmpunkt fallen
+        const proZeile = z * z / PERS * gh / sf.laenge, proSpalte = gw / Math.max(1, b);
+        const st2 = Math.max(0, Math.min(6, Math.floor(Math.log2(Math.max(1, proZeile, proSpalte)))));
+        const r = gR[st2], l = gL[st2], gy = (1 - ((s + z) / sf.laenge) % 1) * (r.height - 1);
+        g.drawImage(r, 0, gy, r.width, 1, xr - ue, y, b, h);
+        g.drawImage(l, 0, gy, l.width, 1, xl + ue - b, y, b, h);
       }
       g.drawImage(st.bild, 0, (1 - anteil) * (ih - 1), iw, 1, xl, y, xr - xl, h);
     };
