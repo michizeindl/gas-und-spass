@@ -124,20 +124,16 @@
     }
     else if (phase === 'rad') {
       zeit += dt;
-      if (zeit + strafe >= ZU_LANGSAM && R_.zustand === 'spiel') {   // Zeit abgelaufen: Spielende mit 0 Punkten
-        phase = 'aus';
-        R_.ton('fehler'); R_.vibrieren([200, 80, 200]);
-        R_.ende(0, { ueberschrift: 'Zu langsam', auswertung: auswertung(true), verzoegerung: 300 });
-        return;
-      }
+      if (zuLangsam()) return;
       if (r.wechsel) { richtungT += dt; if (richtungT > r.wechsel) { richtungT = 0; richtung = -richtung; } }
       winkel += r.dreh * richtung * dt;
     }
     else if (phase === 'raus' && phaseT > WECHSEL) { rad++; neuesRad(); phase = 'rein'; phaseT = 0; ansagen(); }
     else if (phase === 'rein' && phaseT > WECHSEL) radLos();
     else if (phase === 'dm') {
+      if (dmWert == null) zeit += dt;
+      if (zuLangsam()) return;   // gilt auch beim Einstellen des Drehmomentschlüssels (inkl. Strafzeit)
       if (dmWert == null) {
-        zeit += dt;
         // Zeiger pendelt über die Skala; je größer das Rad, desto schneller, bei den Transportern ungleichmäßig
         const tempo = 1.5 + rad * 0.22, unruhig = r.tipps > 1 ? 1 + 0.55 * Math.sin(phaseT * 2.7) : 1;
         dmLauf += dt * tempo * unruhig;
@@ -147,13 +143,27 @@
       const t = gesamt();
       R_.ton('sieg');
       R_.ende(punkteAus(t), {
-        ueberschrift: t < 36 ? 'Formel-1-Niveau' : t < 43 ? 'Profi-Mechaniker' : t < 52 ? 'Gute Arbeit' : t < 63 ? 'Passt schon' : 'Endlich fertig',
+        ueberschrift: stufe(punkteAus(t)),
         zusatz: sekunden(t),
         auswertung: auswertung(false),
       });
     }
     const nr = Math.min(rad, RAEDER.length - 1);
     R_.anzeige(`Runde ${nr + 1}/${RAEDER.length} – ${RAEDER[nr].name}`, sekunden(zeit + strafe));
+  }
+
+  // Zeit (mit Strafzeit) abgelaufen: Spielende mit 0 Punkten – in jeder Phase, in der die Zeit läuft
+  function zuLangsam() {
+    if (zeit + strafe < ZU_LANGSAM || R_.zustand !== 'spiel') return false;
+    phase = 'aus';
+    R_.ton('fehler'); R_.vibrieren([200, 80, 200]);
+    R_.ende(0, { ueberschrift: 'Zu langsam', auswertung: auswertung(true), verzoegerung: 300 });
+    return true;
+  }
+
+  // Bewertung nach Punkten mit den gemeinsamen Grenzen 900/800/700/550 (wie Einparken und Bremsen)
+  function stufe(p) {
+    return p >= 900 ? 'Formel-1-Niveau' : p >= 800 ? 'Profi-Mechaniker' : p >= 700 ? 'Gute Arbeit' : p >= 550 ? 'Passt schon' : 'Endlich fertig';
   }
 
   // Neues Rad ist da: erst den Drehmomentschlüssel einstellen (ab Runde 2), dann die Muttern

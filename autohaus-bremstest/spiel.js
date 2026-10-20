@@ -132,8 +132,9 @@
     const unfall = ergebnisse.some(e => e.unfall), fehlstart = zuFruehGesamt >= ZU_FRUEH_MAX;
     const t = Math.round(schnitt * 100) / 100, aus = unfall || fehlstart;
     R_.ton(aus ? 'fehler' : 'sieg');
-    R_.ende(aus ? 0 : punkteAus(t), {
-      ueberschrift: unfall ? 'Nicht unfallfrei' : fehlstart ? 'Zu oft zu früh' : t < 0.5 ? 'Blitzschnell' : t < 0.6 ? 'Hellwach' : t < 0.75 ? 'Gute Reflexe' : t < 0.9 ? 'Solide reagiert' : 'Gerade noch geschafft',
+    const punkte = aus ? 0 : punkteAus(t);   // Bewertung nach Punkten, gemeinsame Grenzen 900/800/700/550
+    R_.ende(punkte, {
+      ueberschrift: unfall ? 'Nicht unfallfrei' : fehlstart ? 'Zu oft zu früh' : punkte >= 900 ? 'Blitzschnell' : punkte >= 800 ? 'Hellwach' : punkte >= 700 ? 'Gute Reflexe' : punkte >= 550 ? 'Solide reagiert' : 'Gerade noch geschafft',
       zusatz: aus ? '' : 'Ø ' + sek(t),
       auswertung: {   // Reaktionszeit je Fahrt; nach einem Unfall sind die übrigen Fahrten grau
         zeilen: FAHRTEN.map((f, i) => {
