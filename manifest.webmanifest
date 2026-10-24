@@ -3,6 +3,7 @@
   "short_name": "Gas & Spaß",
   "description": "Drei Mini-Spiele rund ums Auto: Boxenstopp, Einpark-Profi und Probefahrt.",
   "lang": "de",
+  "id": "/gas-und-spass/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
